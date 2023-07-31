@@ -1,14 +1,15 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+//! # rsomeip
+//!
+//! A Rust implementation of AUTOSTAR's [Scalable service-Oriented MiddlewarE over IP
+//! (SOME/IP)](https://some-ip.com/).
+//!
+//! ## Overview
+//!
+//! This library enables Rust applications to communicate with other applications using
+//! SOME/IP, a message-based Inter-process Communication (IPC) protocol developed for the
+//! automotive industry.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+#![warn(clippy::nursery)]
+#![warn(clippy::pedantic)]
+#![warn(clippy::expect_used)]
+#![warn(clippy::unwrap_used)]
