@@ -2,5 +2,9 @@
     "cSpell.words": [
         "AUTOSTAR",
         "rsomeip"
-    ]
+    ],
+    "[rust]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "rust-lang.rust-analyzer"
+    }
 }
