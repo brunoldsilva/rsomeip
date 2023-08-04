@@ -1,0 +1,2 @@
+# It's useful to allow `expect` during testing in order to reduce verbosity.
+allow-expect-in-tests = true
