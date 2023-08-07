@@ -2,7 +2,6 @@
 
 use super::*;
 use crate::testing::{ipv4, port};
-use std::net::{IpAddr, Ipv4Addr};
 
 #[tokio::test]
 async fn connect() {
@@ -47,10 +46,10 @@ macro_rules! send_buf {
 
 #[tokio::test]
 async fn receive() {
-    const PORT: u16 = port!();
-    const SRC: SocketAddr = ipv4!([127, 0, 0, 1], PORT);
-    const DST: SocketAddr = ipv4!([127, 0, 0, 2], PORT);
-    let mut connection = Factory::connect(SRC, Some(DST))
+    let port: u16 = port!();
+    let src: SocketAddr = ipv4!([127, 0, 0, 1], port);
+    let dst: SocketAddr = ipv4!([127, 0, 0, 2], port);
+    let mut connection = Factory::connect(src, Some(dst))
         .await
         .expect("Should create a connection.");
 
@@ -68,16 +67,16 @@ async fn receive() {
     });
 
     let buf = [1u8; 1024];
-    send_buf!(buf, DST, SRC);
+    send_buf!(buf, dst, src);
     task.await.expect("Should complete the task.");
 }
 
 #[tokio::test]
 async fn receive_no_dst() {
-    const PORT: u16 = port!();
-    const SRC: SocketAddr = ipv4!([127, 0, 0, 1], PORT);
-    const DST: SocketAddr = ipv4!([127, 0, 0, 2], PORT);
-    let mut connection = Factory::connect(SRC, None)
+    let port: u16 = port!();
+    let src: SocketAddr = ipv4!([127, 0, 0, 1], port);
+    let dst: SocketAddr = ipv4!([127, 0, 0, 2], port);
+    let mut connection = Factory::connect(src, None)
         .await
         .expect("Should create a connection.");
 
@@ -95,26 +94,26 @@ async fn receive_no_dst() {
     });
 
     let buf = [1u8; 1024];
-    send_buf!(buf, DST, SRC);
+    send_buf!(buf, dst, src);
     handle.await.expect("Should complete the task.");
 }
 
 #[tokio::test]
 async fn send() {
-    const PORT: u16 = port!();
-    const SRC: SocketAddr = ipv4!([127, 0, 0, 1], PORT);
-    const DST: SocketAddr = ipv4!([127, 0, 0, 2], PORT);
-    let connection = Factory::connect(SRC, Some(DST))
+    let port: u16 = port!();
+    let src: SocketAddr = ipv4!([127, 0, 0, 1], port);
+    let dst: SocketAddr = ipv4!([127, 0, 0, 2], port);
+    let connection = Factory::connect(src, Some(dst))
         .await
         .expect("Should create a connection.");
 
     let handle = tokio::spawn(async move {
         let mut buf = [0u8; 1024];
-        let socket = UdpSocket::bind(DST)
+        let socket = UdpSocket::bind(dst)
             .await
             .expect("Should bind to the address.");
         socket
-            .connect(SRC)
+            .connect(src)
             .await
             .expect("Should connect to the address.");
         socket
@@ -145,7 +144,7 @@ async fn drop() {
     let connection = Factory::connect(src, dst)
         .await
         .expect("Should create a connection.");
-    let socket = Arc::downgrade(&connection.connection);
+    let socket = Arc::downgrade(&connection.socket);
     assert!(socket.upgrade().is_some(), "Should exist.");
     std::mem::drop(connection);
     assert!(

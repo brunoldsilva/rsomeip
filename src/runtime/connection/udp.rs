@@ -1,4 +1,4 @@
-use super::{Connection, Handle};
+use super::{Connection, Socket};
 use std::{
     io,
     net::SocketAddr,
@@ -11,7 +11,7 @@ use tokio::{
 
 mod tests;
 
-impl Connection for UdpSocket {}
+impl Socket for UdpSocket {}
 
 pub(super) struct Factory;
 
@@ -19,7 +19,7 @@ impl Factory {
     pub(super) async fn connect(
         src: SocketAddr,
         dst: Option<SocketAddr>,
-    ) -> Result<Handle, io::Error> {
+    ) -> Result<Connection, io::Error> {
         let socket = UdpSocket::bind(src).await.map(Arc::new)?;
         let receiver = Self::recv(Arc::downgrade(&socket));
         let sender = match dst {
@@ -29,10 +29,10 @@ impl Factory {
             }
             None => None,
         };
-        Ok(Handle {
-            connection: socket,
+        Ok(Connection {
             receiver,
             sender,
+            socket,
         })
     }
 
