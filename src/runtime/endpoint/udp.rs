@@ -8,12 +8,20 @@ use tokio::{net::UdpSocket, sync::mpsc};
 
 mod tests;
 
+/// An asynchronous binding to a socket address that receives and send messages.
 pub(super) struct UdpEndpoint {
     socket: Arc<UdpSocket>,
     sender: mpsc::Sender<Message>,
 }
 
 impl UdpEndpoint {
+    /// Binds an `UdpEndpoint` to a `SocketAddr`.
+    ///
+    /// This returns the endpoint and a receiver to read messages sent to the address.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the socket fails to bind to the address.
     pub(super) async fn bind(
         addr: SocketAddr,
     ) -> Result<(Self, mpsc::Receiver<Message>), io::Error> {
@@ -36,6 +44,7 @@ impl UdpEndpoint {
         ))
     }
 
+    /// An asynchronous task that sends messages to their destinations.
     async fn send(socket: Weak<UdpSocket>, mut receiver: mpsc::Receiver<Message>) {
         loop {
             let Some((addr, msg)) = receiver.recv().await else {
@@ -50,6 +59,7 @@ impl UdpEndpoint {
         }
     }
 
+    /// An asynchronous task that receives messages from the socket.
     async fn recv(socket: Weak<UdpSocket>, sender: mpsc::Sender<Message>) {
         loop {
             let Some(socket) = socket.upgrade() else {
@@ -65,6 +75,7 @@ impl UdpEndpoint {
         }
     }
 
+    /// Clone the sender chanel.
     fn sender(&self) -> mpsc::Sender<Message> {
         self.sender.clone()
     }
