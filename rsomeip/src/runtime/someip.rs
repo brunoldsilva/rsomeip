@@ -1,3 +1,5 @@
+use crate::bytes::{self, ser, Serializer};
+
 mod tests;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,6 +52,24 @@ impl std::fmt::Display for Message {
             "[{:04x}.{:04x}.{:04x}.{:04x}]",
             self.service_id, self.method_id, self.client_id, self.session_id
         )
+    }
+}
+
+impl bytes::Serialize for Message {
+    fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
+        self.service_id.serialize(ser)?;
+        self.method_id.serialize(ser)?;
+        (|ser: &mut Serializer| {
+            self.client_id.serialize(ser)?;
+            self.session_id.serialize(ser)?;
+            self.protocol_version.serialize(ser)?;
+            self.interface_version.serialize(ser)?;
+            self.message_type.serialize(ser)?;
+            self.return_code.serialize(ser)?;
+            self.payload.serialize(ser)?;
+            Ok(())
+        })
+        .serialize_len(ser, ser::LengthField::U32)
     }
 }
 
@@ -152,6 +172,30 @@ impl From<u8> for MessageType {
     }
 }
 
+impl From<MessageType> for u8 {
+    fn from(value: MessageType) -> Self {
+        match value {
+            MessageType::Request => 0x00,
+            MessageType::RequestNoReturn => 0x01,
+            MessageType::Notification => 0x02,
+            MessageType::Response => 0x80,
+            MessageType::Error => 0x81,
+            MessageType::TpRequest => 0x20,
+            MessageType::TpRequestNoReturn => 0x21,
+            MessageType::TpNotification => 0x22,
+            MessageType::TpResponse => 0xa0,
+            MessageType::TpError => 0xa1,
+            MessageType::Unknown(x) => x,
+        }
+    }
+}
+
+impl bytes::Serialize for MessageType {
+    fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
+        u8::from(*self).serialize(ser)
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ReturnCode {
@@ -198,5 +242,35 @@ impl From<u8> for ReturnCode {
             n if (0x10..=0x5e).contains(&n) => Self::Reserved(n),
             n => Self::Unknown(n),
         }
+    }
+}
+
+impl From<ReturnCode> for u8 {
+    fn from(value: ReturnCode) -> Self {
+        match value {
+            ReturnCode::Ok => 0x00,
+            ReturnCode::NotOk => 0x01,
+            ReturnCode::UnknownService => 0x02,
+            ReturnCode::UnknownMethod => 0x03,
+            ReturnCode::NotReady => 0x04,
+            ReturnCode::NotReachable => 0x05,
+            ReturnCode::Timeout => 0x06,
+            ReturnCode::WrongProtocolVersion => 0x07,
+            ReturnCode::WrongInterfaceVersion => 0x08,
+            ReturnCode::MalformedMessage => 0x09,
+            ReturnCode::WrongMessageType => 0x0a,
+            ReturnCode::E2eRepeated => 0x0b,
+            ReturnCode::E2eWrongSequence => 0x0c,
+            ReturnCode::E2e => 0x0d,
+            ReturnCode::E2eNotAvailable => 0x0e,
+            ReturnCode::E2eNoNewData => 0x0f,
+            ReturnCode::Reserved(x) | ReturnCode::Unknown(x) => x,
+        }
+    }
+}
+
+impl bytes::Serialize for ReturnCode {
+    fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
+        u8::from(*self).serialize(ser)
     }
 }

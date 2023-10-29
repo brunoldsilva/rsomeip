@@ -73,6 +73,23 @@ fn message_type_from_u8() {
 }
 
 #[test]
+fn u8_from_message_type() {
+    assert_eq!(u8::from(MessageType::Request), 0x00);
+    assert_eq!(u8::from(MessageType::RequestNoReturn), 0x01);
+    assert_eq!(u8::from(MessageType::Notification), 0x02);
+    assert_eq!(u8::from(MessageType::Response), 0x80);
+    assert_eq!(u8::from(MessageType::Error), 0x81);
+    assert_eq!(u8::from(MessageType::TpRequest), 0x20);
+    assert_eq!(u8::from(MessageType::TpRequestNoReturn), 0x21);
+    assert_eq!(u8::from(MessageType::TpNotification), 0x22);
+    assert_eq!(u8::from(MessageType::TpResponse), 0xa0);
+    assert_eq!(u8::from(MessageType::TpError), 0xa1);
+    (u8::MIN..=u8::MAX)
+        .filter(|x| ![0x00, 0x01, 0x02, 0x80, 0x81, 0x20, 0x21, 0x22, 0xa0, 0xa1].contains(x))
+        .for_each(|x| assert_eq!(u8::from(MessageType::Unknown(x)), x));
+}
+
+#[test]
 fn return_code_from_u8() {
     assert_eq!(ReturnCode::Ok, ReturnCode::from(0x00));
     assert_eq!(ReturnCode::NotOk, ReturnCode::from(0x01));
@@ -92,4 +109,26 @@ fn return_code_from_u8() {
     assert_eq!(ReturnCode::E2eNoNewData, ReturnCode::from(0x0f));
     (0x10..=0x5e).for_each(|x| assert_eq!(ReturnCode::Reserved(x), ReturnCode::from(x)));
     (0x5f..=u8::MAX).for_each(|x| assert_eq!(ReturnCode::Unknown(x), ReturnCode::from(x)));
+}
+
+#[test]
+fn u8_from_return_code() {
+    assert_eq!(u8::from(ReturnCode::Ok), 0x00);
+    assert_eq!(u8::from(ReturnCode::NotOk), 0x01);
+    assert_eq!(u8::from(ReturnCode::UnknownService), 0x02);
+    assert_eq!(u8::from(ReturnCode::UnknownMethod), 0x03);
+    assert_eq!(u8::from(ReturnCode::NotReady), 0x04);
+    assert_eq!(u8::from(ReturnCode::NotReachable), 0x05);
+    assert_eq!(u8::from(ReturnCode::Timeout), 0x06);
+    assert_eq!(u8::from(ReturnCode::WrongProtocolVersion), 0x07);
+    assert_eq!(u8::from(ReturnCode::WrongInterfaceVersion), 0x08);
+    assert_eq!(u8::from(ReturnCode::MalformedMessage), 0x09);
+    assert_eq!(u8::from(ReturnCode::WrongMessageType), 0x0a);
+    assert_eq!(u8::from(ReturnCode::E2eRepeated), 0x0b);
+    assert_eq!(u8::from(ReturnCode::E2eWrongSequence), 0x0c);
+    assert_eq!(u8::from(ReturnCode::E2e), 0x0d);
+    assert_eq!(u8::from(ReturnCode::E2eNotAvailable), 0x0e);
+    assert_eq!(u8::from(ReturnCode::E2eNoNewData), 0x0f);
+    (0x10..=0x5e).for_each(|x| assert_eq!(u8::from(ReturnCode::Reserved(x)), x));
+    (0x5f..=u8::MAX).for_each(|x| assert_eq!(u8::from(ReturnCode::Unknown(x)), x));
 }

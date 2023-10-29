@@ -75,6 +75,21 @@ impl UdpEndpoint {
         }
     }
 
+    // async fn decode(receiver: mpsc::Receiver<Message>, sender: mpsc::Sender<SomeIpMessage>) {
+    //     loop {
+    //         let Some((addr, data)) = receiver.recv().await else {
+    //             return;
+    //         };
+    //         let Ok(message) = SomeIpMessage::from(data) else {
+    //             return;
+    //         };
+    //         if !clients.contains(message.message_id) {
+    //             clients[message_id] = addr;
+    //         }
+    //     }
+    //     todo!()
+    // }
+
     /// Clone the sender chanel.
     fn sender(&self) -> mpsc::Sender<Message> {
         self.sender.clone()

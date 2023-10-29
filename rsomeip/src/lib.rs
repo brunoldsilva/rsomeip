@@ -11,6 +11,8 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::expect_used)]
 #![warn(clippy::unwrap_used)]
+#![allow(clippy::missing_const_for_fn)]
 
+pub mod bytes;
 mod runtime;
 pub(crate) mod testing;
