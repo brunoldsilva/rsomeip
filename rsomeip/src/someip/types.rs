@@ -1,142 +1,165 @@
-use crate::bytes::{self, ser, Serializer};
+use crate::bytes::{self, Deserialize, Serialize};
+use std::fmt::Display;
 
 mod tests;
 
+/// The raw message data with some additional parameters.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Message {
-    pub service_id: u16,
-    pub method_id: u16,
-    pub length: u32,
+pub struct Payload {
     pub client_id: u16,
     pub session_id: u16,
     pub protocol_version: u8,
     pub interface_version: u8,
     pub message_type: MessageType,
     pub return_code: ReturnCode,
-    pub payload: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
-impl Message {
+impl Payload {
+    /// Creates a new [`Payload`].
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a [`PayloadBuilder`] help build a new payload.
+    pub fn builder() -> PayloadBuilder {
+        PayloadBuilder::new()
+    }
+}
+
+impl Serialize for Payload {
+    fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
+        self.client_id.serialize(ser)?;
+        self.session_id.serialize(ser)?;
+        self.protocol_version.serialize(ser)?;
+        self.interface_version.serialize(ser)?;
+        self.message_type.serialize(ser)?;
+        self.return_code.serialize(ser)?;
+        self.data.serialize(ser)
+    }
+}
+
+impl Deserialize for Payload {
+    fn deserialize(de: &mut bytes::Deserializer) -> bytes::Result<Self> {
+        Ok(Self {
+            client_id: u16::deserialize(de)?,
+            session_id: u16::deserialize(de)?,
+            protocol_version: u8::deserialize(de)?,
+            interface_version: u8::deserialize(de)?,
+            message_type: MessageType::deserialize(de)?,
+            return_code: ReturnCode::deserialize(de)?,
+            data: Vec::deserialize(de)?,
+        })
+    }
+}
+
+impl Default for Payload {
+    fn default() -> Self {
+        Self {
+            client_id: u16::default(),
+            session_id: u16::default(),
+            protocol_version: 0x01_u8,
+            interface_version: u8::default(),
+            message_type: MessageType::default(),
+            return_code: ReturnCode::default(),
+            data: Vec::default(),
+        }
+    }
+}
+
+impl Display for Payload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "[{:04x}.{:04x}]{{{}}}",
+            self.client_id,
+            self.session_id,
+            self.data.len()
+        )
+    }
+}
+
+/// A helper for constructing a [`Payload`] step-by-step.
+///
+/// # Examples
+///
+/// Basic usage:
+///
+/// ```ignore
+/// let payload = Payload::builder()
+///     .client_id(0x1234)
+///     .session_id(0x5678)
+///     .build();
+/// ```
+#[derive(Debug, Default)]
+pub struct PayloadBuilder {
+    inner: Payload,
+}
+
+impl PayloadBuilder {
+    /// Creates a new [`PayloadBuilder`].
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Consumes the builder to get the constructed payload.
     #[must_use]
-    pub fn builder() -> MessageBuilder {
-        MessageBuilder::new()
+    pub fn build(self) -> Payload {
+        self.inner
     }
-}
 
-impl Default for Message {
-    fn default() -> Self {
-        Self {
-            service_id: Default::default(),
-            method_id: Default::default(),
-            length: 8,
-            client_id: Default::default(),
-            session_id: Default::default(),
-            protocol_version: 1,
-            interface_version: Default::default(),
-            message_type: MessageType::default(),
-            return_code: ReturnCode::default(),
-            payload: Vec::default(),
-        }
-    }
-}
-
-impl std::fmt::Display for Message {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "[{:04x}.{:04x}.{:04x}.{:04x}]",
-            self.service_id, self.method_id, self.client_id, self.session_id
-        )
-    }
-}
-
-impl bytes::Serialize for Message {
-    fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
-        self.service_id.serialize(ser)?;
-        self.method_id.serialize(ser)?;
-        (|ser: &mut Serializer| {
-            self.client_id.serialize(ser)?;
-            self.session_id.serialize(ser)?;
-            self.protocol_version.serialize(ser)?;
-            self.interface_version.serialize(ser)?;
-            self.message_type.serialize(ser)?;
-            self.return_code.serialize(ser)?;
-            self.payload.serialize(ser)?;
-            Ok(())
-        })
-        .serialize_len(ser, ser::LengthField::U32)
-    }
-}
-
-pub struct MessageBuilder {
-    msg: Message,
-}
-
-#[allow(clippy::missing_const_for_fn)]
-impl MessageBuilder {
+    /// Sets the client id.
     #[must_use]
-    pub fn new() -> Self {
-        Self {
-            msg: Message::default(),
-        }
-    }
-
-    pub fn service_id(mut self, value: u16) -> Self {
-        self.msg.service_id = value;
-        self
-    }
-
-    pub fn method_id(mut self, value: u16) -> Self {
-        self.msg.method_id = value;
-        self
-    }
-
-    pub fn length(mut self, value: u32) -> Self {
-        self.msg.length = value;
-        self
-    }
-
     pub fn client_id(mut self, value: u16) -> Self {
-        self.msg.client_id = value;
+        self.inner.client_id = value;
         self
     }
 
-    pub fn session_id(mut self, value: u16) -> Self {
-        self.msg.session_id = value;
-        self
-    }
-
-    pub fn protocol_version(mut self, value: u8) -> Self {
-        self.msg.protocol_version = value;
-        self
-    }
-
-    pub fn interface_version(mut self, value: u8) -> Self {
-        self.msg.interface_version = value;
-        self
-    }
-
-    pub fn message_type(mut self, value: MessageType) -> Self {
-        self.msg.message_type = value;
-        self
-    }
-
-    pub fn return_code(mut self, value: ReturnCode) -> Self {
-        self.msg.return_code = value;
-        self
-    }
-
+    /// Sets the session id.
     #[must_use]
-    pub fn build(self) -> Message {
-        self.msg
+    pub fn session_id(mut self, value: u16) -> Self {
+        self.inner.session_id = value;
+        self
+    }
+
+    /// Sets the protocol version.
+    #[must_use]
+    pub fn protocol_version(mut self, value: u8) -> Self {
+        self.inner.protocol_version = value;
+        self
+    }
+
+    /// Sets the interface version.
+    #[must_use]
+    pub fn interface_version(mut self, value: u8) -> Self {
+        self.inner.interface_version = value;
+        self
+    }
+
+    /// Sets the message type.
+    #[must_use]
+    pub fn message_type(mut self, value: MessageType) -> Self {
+        self.inner.message_type = value;
+        self
+    }
+
+    /// Sets the return code.
+    #[must_use]
+    pub fn return_code(mut self, value: ReturnCode) -> Self {
+        self.inner.return_code = value;
+        self
+    }
+
+    /// Sets the raw payload data.
+    #[must_use]
+    pub fn data(mut self, value: Vec<u8>) -> Self {
+        self.inner.data = value;
+        self
     }
 }
 
+/// Used to differentiate different types of messages.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum MessageType {
@@ -196,6 +219,13 @@ impl bytes::Serialize for MessageType {
     }
 }
 
+impl bytes::Deserialize for MessageType {
+    fn deserialize(de: &mut bytes::Deserializer) -> bytes::Result<Self> {
+        u8::deserialize(de).map(Self::from)
+    }
+}
+
+/// Used to signal whether a request was successfully processed.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ReturnCode {
@@ -272,5 +302,11 @@ impl From<ReturnCode> for u8 {
 impl bytes::Serialize for ReturnCode {
     fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
         u8::from(*self).serialize(ser)
+    }
+}
+
+impl bytes::Deserialize for ReturnCode {
+    fn deserialize(de: &mut bytes::Deserializer) -> bytes::Result<Self> {
+        u8::deserialize(de).map(Self::from)
     }
 }
