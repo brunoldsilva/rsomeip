@@ -6,6 +6,7 @@ pub enum Error {
     Failure,
     BufferOverflow,
     LengthOverflow,
+    ExceedsLimit,
 }
 
 impl std::fmt::Display for Error {
@@ -15,6 +16,7 @@ impl std::fmt::Display for Error {
             Self::Failure => write!(f, "operation failed unexpectedly"),
             Self::BufferOverflow => write!(f, "writing exceeds buffer capacity"),
             Self::LengthOverflow => write!(f, "length exceeds maximum value"),
+            Self::ExceedsLimit => write!(f, "operation exceeds limit"),
         }
     }
 }

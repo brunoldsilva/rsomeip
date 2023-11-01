@@ -1,4 +1,4 @@
-use super::{Error, Result};
+use super::{Error, LengthField, Result};
 use std::{ops::Range, usize};
 
 mod tests;
@@ -69,13 +69,6 @@ impl<'a> Serializer<'a> {
             })
             .ok_or(Error::BufferOverflow)
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum LengthField {
-    U8,
-    U16,
-    U32,
 }
 
 /// A trait for serializing data structures into a byte stream.
