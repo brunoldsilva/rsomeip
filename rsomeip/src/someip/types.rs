@@ -85,7 +85,8 @@ impl Display for Payload {
 ///
 /// Basic usage:
 ///
-/// ```ignore
+/// ```
+/// use rsomeip::someip::Payload;
 /// let payload = Payload::builder()
 ///     .client_id(0x1234)
 ///     .session_id(0x5678)

@@ -1,8 +1,9 @@
 use crate::bytes::{self, Deserialize, Serialize};
-use types::Payload;
 
 mod tests;
 mod types;
+
+pub use types::Payload;
 
 /// A payload addressed to a given service and method.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -23,6 +24,14 @@ impl Message {
     #[must_use]
     pub fn builder() -> MessageBuilder {
         MessageBuilder::new()
+    }
+
+    /// Returns the message id, which is a combination of the service id with the method id.
+    ///
+    /// For example, a message with `service_id = 0x1234` and `method_id = 0x5678` will have
+    /// `message_id = 0x1234_5678`.
+    pub fn message_id(&self) -> u32 {
+        (u32::from(self.service_id) << 16) | u32::from(self.method_id)
     }
 }
 
@@ -60,7 +69,8 @@ impl Deserialize for Message {
 ///
 /// Basic usage:
 ///
-/// ```ignore
+/// ```
+/// use rsomeip::someip::Message;
 /// let message = Message::builder()
 ///     .service_id(0x1234)
 ///     .method_id(0x5678)

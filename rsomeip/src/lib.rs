@@ -15,6 +15,7 @@
 #![allow(clippy::must_use_candidate)]
 
 pub mod bytes;
-mod runtime;
+#[allow(unused)] // Work in progress.
+pub mod endpoint;
 pub mod someip;
 pub(crate) mod testing;
