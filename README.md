@@ -14,7 +14,7 @@ SOME/IP supports a wide range of middleware features, most notably:
 
 An overview of the protocol's features can be found [here](https://some-ip.com/details.shtml).
 
-*Disclaimer: This project is highly experimental and makes no guarantees of correctly supporting the SOME/IP protocol.*
+*Disclaimer: This project is highly experimental and makes no guarantees of correctly supporting the SOME/IP protocol, at this time.*
 
 ## Getting Started
 
