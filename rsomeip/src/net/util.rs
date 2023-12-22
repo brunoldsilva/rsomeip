@@ -25,14 +25,14 @@ mod tests;
 /// let mut pool = BufferPool::new();
 ///
 /// // Pulling will only work if there are available buffers in the pool.
-/// let mut buffer: Arc<[u8]> = pool.try_pull().unwrap_or(Arc::new([0u8; 8]));
+/// let mut buffer: Arc<[u8]> = pool.pull_or_else(|| Arc::new([0u8; 8]));
 ///
 /// // By using `get_mut()`, we are able to modify the contents of the buffer.
 /// if let Some(buffer) = Arc::get_mut(&mut buffer) {
 ///     buffer.iter_mut().for_each(|elem| *elem += 1);
 /// }
 ///
-/// // Add the buffer back to the pull to be used later, when it becomes available.
+/// // Add the buffer back to the pool to be used later, when it becomes available.
 /// pool.push(buffer.clone());
 ///
 /// // Send the buffer to wherever you want. You can then retrieve it from the pool
@@ -60,6 +60,16 @@ impl BufferPool {
             }
         }
         None
+    }
+
+    /// Returns an available buffer, or creates a new one with the provided closure.
+    ///
+    /// The closure is only called if there are no available buffers in the pool.
+    pub fn pull_or_else<F>(&mut self, f: F) -> Arc<[u8]>
+    where
+        F: FnOnce() -> Arc<[u8]>,
+    {
+        self.try_pull().unwrap_or_else(f)
     }
 
     /// Adds the `buffer` to the pool.

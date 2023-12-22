@@ -1,4 +1,5 @@
 use crate::net::{Error, Result, SocketAddr};
+use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
 #[cfg(test)]
@@ -6,7 +7,7 @@ mod tests;
 mod udp;
 
 /// Data addressed to a given target.
-pub type Packet = (SocketAddr, Box<[u8]>);
+pub type Packet = (SocketAddr, Arc<[u8]>);
 
 /// An abstraction over the underlying communication protocol.
 ///
@@ -49,7 +50,7 @@ impl Socket {
     ///
     /// Returns an error if the socket is unavailable, or if the socket was unable to send
     /// the data.
-    pub async fn send(&self, address: SocketAddr, data: Box<[u8]>) -> Result<()> {
+    pub async fn send(&self, address: SocketAddr, data: Arc<[u8]>) -> Result<()> {
         self.send_message(Operation::Send((address, data))).await
     }
 

@@ -45,7 +45,7 @@ async fn send_messages() {
             .expect("should send the response back");
     });
     socket
-        .send(ipv4!([127, 0, 0, 1]), Box::new([1u8; 16]))
+        .send(ipv4!([127, 0, 0, 1]), std::sync::Arc::new([1u8; 16]))
         .await
         .expect("should get an Ok response");
     socket
