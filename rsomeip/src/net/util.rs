@@ -17,7 +17,6 @@ mod tests;
 /// Basic usage:
 ///
 /// ```
-/// # fn awesome_function(_buffer: Arc<[u8]>) {}
 /// use rsomeip::net::util::BufferPool;
 /// use std::sync::Arc;
 ///
@@ -37,6 +36,7 @@ mod tests;
 ///
 /// // Send the buffer to wherever you want. You can then retrieve it from the pool
 /// // once you're done using it.
+/// # fn awesome_function(_buffer: Arc<[u8]>) {}
 /// awesome_function(buffer);
 /// ```
 #[derive(Debug, Default)]
@@ -54,12 +54,10 @@ impl BufferPool {
     ///
     /// A buffer is considered available if there are no external references to it.
     pub fn try_pull(&mut self) -> Option<Arc<[u8]>> {
-        for (index, buffer) in self.buffers.iter().enumerate() {
-            if Arc::strong_count(buffer) + Arc::weak_count(buffer) == 1 {
-                return Some(self.buffers.swap_remove(index));
-            }
-        }
-        None
+        self.buffers
+            .iter_mut()
+            .position(|buffer| Arc::get_mut(buffer).is_some())
+            .map(|index| self.buffers.swap_remove(index))
     }
 
     /// Returns an available buffer, or creates a new one with the provided closure.

@@ -4,6 +4,8 @@ use tokio::sync::{mpsc, oneshot};
 
 #[cfg(test)]
 mod tests;
+
+mod tcp;
 mod udp;
 
 /// Data addressed to a given target.
