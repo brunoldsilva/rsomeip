@@ -43,6 +43,14 @@ impl Socket {
         Ok((Self::new(tx_messages), packets))
     }
 
+    /// Binds a TCP [`Socket`] to the given address.
+    pub fn tcp(address: SocketAddr) -> (Self, mpsc::Receiver<Packet>) {
+        let (tx_messages, rx_messages) = mpsc::channel(32);
+        let (tx_packets, rx_packets) = mpsc::channel(32);
+        tcp::bind(address, (tx_packets, rx_messages));
+        (Self::new(tx_messages), rx_packets)
+    }
+
     /// Sends the `data` to the given `address`.
     ///
     /// Depending on the communication protocol that is being used, a connection might need to be
