@@ -20,3 +20,4 @@ tokio-util = "0.7.10"
 
 [dev-dependencies]
 rand = "0.8.5"
+tokio-test = "0.4.3"
