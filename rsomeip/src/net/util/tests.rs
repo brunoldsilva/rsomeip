@@ -29,6 +29,22 @@ fn try_pull() {
 }
 
 #[tokio::test]
+async fn response_send() {
+    let (sender, receiver) = response_channels::<(), i32>();
+    let handle = tokio::spawn(async move {
+        sender.send(Ok(()));
+    });
+    let response = timeout(Duration::from_millis(10), receiver.get())
+        .await
+        .expect("should not timeout");
+    assert_eq!(response, Some(Ok(())));
+    timeout(Duration::from_millis(10), handle)
+        .await
+        .expect("should not timeout")
+        .expect("should complete successfully");
+}
+
+#[tokio::test]
 async fn response_ok() {
     let (sender, receiver) = response_channels::<(), i32>();
     let handle = tokio::spawn(async move {

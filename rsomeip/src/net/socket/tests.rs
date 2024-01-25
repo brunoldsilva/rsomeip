@@ -16,33 +16,23 @@ async fn send_messages() {
         let message = receiver.recv().await.expect("should receive a message");
         let (op, response) = message.into_parts();
         assert!(matches!(op, Operation::Send(_)));
-        response
-            .send(Ok(()))
-            .expect("should send the response back");
+        response.ok(());
         let message = receiver.recv().await.expect("should receive a message");
         let (op, response) = message.into_parts();
         assert!(matches!(op, Operation::Connect(_)));
-        response
-            .send(Ok(()))
-            .expect("should send the response back");
+        response.ok(());
         let message = receiver.recv().await.expect("should receive a message");
         let (op, response) = message.into_parts();
         assert!(matches!(op, Operation::Disconnect(_)));
-        response
-            .send(Ok(()))
-            .expect("should send the response back");
+        response.ok(());
         let message = receiver.recv().await.expect("should receive a message");
         let (op, response) = message.into_parts();
         assert!(matches!(op, Operation::Open));
-        response
-            .send(Ok(()))
-            .expect("should send the response back");
+        response.ok(());
         let message = receiver.recv().await.expect("should receive a message");
         let (op, response) = message.into_parts();
         assert!(matches!(op, Operation::Close));
-        response
-            .send(Ok(()))
-            .expect("should send the response back");
+        response.ok(());
     });
     socket
         .send(ipv4!([127, 0, 0, 1]), std::sync::Arc::new([1u8; 16]))

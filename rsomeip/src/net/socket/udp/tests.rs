@@ -1,5 +1,5 @@
 use super::*;
-use crate::testing::ipv4;
+use crate::{net::util::response_channels, testing::ipv4};
 
 /// Checks that the socket can bind to an address.
 ///
@@ -43,12 +43,14 @@ async fn send() {
 
     // Send the data.
     let data = Arc::new([1u8; 16]);
-    let (message, response) = Message::new(Operation::Send((dst, data.clone())));
+    let (sender, receiver) = response_channels::<(), io::Error>();
+    let message = Message::new(Operation::Send((dst, data.clone())), sender);
     tx_messages
         .send(message)
         .await
         .expect("should send the data to the socket");
-    assert!(response.await.is_ok());
+    let response = receiver.get().await.expect("should receive a response");
+    assert!(response.is_ok());
 
     // Receive the data.
     let mut buffer = [0u8; 16];

@@ -94,7 +94,8 @@ impl BufferPool {
 /// // Move one of them to a different task.
 /// tokio::spawn(async move {
 ///     // Send the response through the sender.
-///     sender.ok(true);
+///     sender.send(Ok(true));
+///     // Or, sender.ok(true);
 ///     // Or, sender.err(-1);
 /// });
 ///
@@ -116,6 +117,7 @@ where
 ///
 /// A pair of [`ResponseSender`] and [`ResponseReceiver`] can be created with the
 /// [`response_channels`] function.
+#[derive(Debug)]
 pub struct ResponseReceiver<T, E> {
     inner: oneshot::Receiver<Result<T, E>>,
 }
@@ -142,6 +144,7 @@ where
 ///
 /// A pair of [`ResponseSender`] and [`ResponseReceiver`] can be created with the
 /// [`response_channels`] function.
+#[derive(Debug)]
 pub struct ResponseSender<T, E> {
     inner: oneshot::Sender<Result<T, E>>,
 }
@@ -150,6 +153,11 @@ impl<T, E> ResponseSender<T, E> {
     /// Creates a new [`ResponseSender`].
     fn new(inner: oneshot::Sender<Result<T, E>>) -> Self {
         Self { inner }
+    }
+
+    /// Send the given [`Result`] to the [`ResponseReceiver`].
+    pub fn send(self, result: Result<T, E>) {
+        let _ = self.inner.send(result);
     }
 
     /// Sends an [`Ok`] response with the given value to the [`ResponseReceiver`].

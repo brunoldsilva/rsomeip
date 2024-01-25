@@ -1,6 +1,11 @@
-use crate::net::{Error, Result, SocketAddr};
-use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot};
+//! Abstractions over TCP and UDP communication primitives.
+
+use crate::net::{
+    util::{response_channels, ResponseSender},
+    IoResult, SocketAddr,
+};
+use std::{io, sync::Arc};
+use tokio::sync::mpsc;
 
 #[cfg(test)]
 mod tests;
@@ -36,7 +41,7 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if the UDP socket cannot bind to the given `address`.
-    pub async fn udp(address: SocketAddr) -> Result<(Self, mpsc::Receiver<Packet>)> {
+    pub async fn udp(address: SocketAddr) -> IoResult<(Self, mpsc::Receiver<Packet>)> {
         let (tx_messages, rx_messages) = mpsc::channel(32);
         let (mut socket, packets) = udp::Socket::bind(address).await?;
         tokio::spawn(async move { socket.process(rx_messages).await });
@@ -60,7 +65,7 @@ impl Socket {
     ///
     /// Returns an error if the socket is unavailable, or if the socket was unable to send
     /// the data.
-    pub async fn send(&self, address: SocketAddr, data: Arc<[u8]>) -> Result<()> {
+    pub async fn send(&self, address: SocketAddr, data: Arc<[u8]>) -> IoResult<()> {
         self.send_message(Operation::Send((address, data))).await
     }
 
@@ -72,7 +77,7 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if the socket is unavailable, or if a connection cannot be established.
-    pub async fn connect(&self, address: SocketAddr) -> Result<()> {
+    pub async fn connect(&self, address: SocketAddr) -> IoResult<()> {
         self.send_message(Operation::Connect(address)).await
     }
 
@@ -84,7 +89,7 @@ impl Socket {
     ///
     /// Returns an error if the socket is unavailable, or if the connection cannot be closed.
     // TODO(brunoldsilva): Need to check if the second part of the last statement makes sense.
-    pub async fn disconnect(&self, address: SocketAddr) -> Result<()> {
+    pub async fn disconnect(&self, address: SocketAddr) -> IoResult<()> {
         self.send_message(Operation::Disconnect(address)).await
     }
 
@@ -96,7 +101,7 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if the socket is unavailable, or if the socket cannot be opened.
-    pub async fn open(&self) -> Result<()> {
+    pub async fn open(&self) -> IoResult<()> {
         self.send_message(Operation::Open).await
     }
 
@@ -108,7 +113,7 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if the socket is unavailable, or if the socket cannot be closed.
-    pub async fn close(&self) -> Result<()> {
+    pub async fn close(&self) -> IoResult<()> {
         self.send_message(Operation::Close).await
     }
 
@@ -117,15 +122,17 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if the channel is closed, or if the response is itself an error.
-    async fn send_message(&self, kind: Operation) -> Result<()> {
-        let (message, response) = Message::new(kind);
+    async fn send_message(&self, kind: Operation) -> IoResult<()> {
+        let (sender, receiver) = response_channels();
+        let message = Message::new(kind, sender);
         self.messages
             .send(message)
             .await
-            .map_err(|_| Error::Failure("socket is closed"))?;
-        response
+            .map_err(|_| io::Error::from(io::ErrorKind::NotConnected))?;
+        receiver
+            .get()
             .await
-            .map_err(|_| Error::Failure("no response given"))?
+            .unwrap_or_else(|| Err(io::Error::from(io::ErrorKind::NotConnected)))
     }
 }
 
@@ -136,24 +143,20 @@ impl Socket {
 #[derive(Debug)]
 pub struct Message {
     operation: Operation,
-    response: oneshot::Sender<Result<()>>,
+    response: ResponseSender<(), io::Error>,
 }
 
 impl Message {
     /// Creates a new [`Message`], and provides a receiver for the response.
-    pub fn new(operation: Operation) -> (Self, oneshot::Receiver<Result<()>>) {
-        let (response, rx) = oneshot::channel();
-        (
-            Self {
-                operation,
-                response,
-            },
-            rx,
-        )
+    pub fn new(operation: Operation, response: ResponseSender<(), io::Error>) -> Self {
+        Self {
+            operation,
+            response,
+        }
     }
 
     /// Consumes the [`Message`], returning the operation and the response channel.
-    pub fn into_parts(self) -> (Operation, oneshot::Sender<Result<()>>) {
+    pub fn into_parts(self) -> (Operation, ResponseSender<(), io::Error>) {
         (self.operation, self.response)
     }
 }

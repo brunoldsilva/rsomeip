@@ -1,13 +1,10 @@
 use crate::net::{
     socket::{Message, Operation, Packet},
-    util::BufferPool,
-    Error, Result, SocketAddr,
+    util::{BufferPool, ResponseSender},
+    IoResult, SocketAddr,
 };
-use std::sync::Arc;
-use tokio::{
-    net::UdpSocket,
-    sync::{mpsc, oneshot},
-};
+use std::{io, sync::Arc};
+use tokio::{net::UdpSocket, sync::mpsc};
 
 #[cfg(test)]
 mod tests;
@@ -25,7 +22,7 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if the UDP socket cannot bind to the given `address`.
-    pub async fn bind(address: SocketAddr) -> Result<(Self, mpsc::Receiver<Packet>)> {
+    pub async fn bind(address: SocketAddr) -> IoResult<(Self, mpsc::Receiver<Packet>)> {
         let inner = UdpSocket::bind(address).await.map(Arc::new)?;
         let (packets, receiver) = mpsc::channel(32);
         Ok((Self { inner, packets }, receiver))
@@ -51,14 +48,18 @@ impl Socket {
     ///
     /// `Send`, `Connect` and `Disconnect` operations are supported. All other operations are
     /// ignored.
-    async fn process_operation(&self, operation: Operation, response: oneshot::Sender<Result<()>>) {
-        let result: Result<()> = match operation {
+    async fn process_operation(
+        &self,
+        operation: Operation,
+        response: ResponseSender<(), io::Error>,
+    ) {
+        let result: IoResult<()> = match operation {
             Operation::Send((address, data)) => self.send(data, address).await,
             Operation::Connect(address) => self.connect(address),
             Operation::Disconnect(address) => self.disconnect(address),
             _ => Ok(()),
         };
-        let _ = response.send(result);
+        response.send(result);
     }
 
     /// Sends the `data` to the given `address`.
@@ -66,11 +67,8 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if the socket was unable to send.
-    async fn send(&self, data: Arc<[u8]>, address: SocketAddr) -> Result<()> {
-        match self.inner.send_to(data.as_ref(), address).await {
-            Ok(_size) => Ok(()),
-            Err(err) => Err(Error::from(err)),
-        }
+    async fn send(&self, data: Arc<[u8]>, address: SocketAddr) -> IoResult<()> {
+        self.inner.send_to(data.as_ref(), address).await.map(|_| ())
     }
 
     /// Establishes a connection to the target at the given `address`.
@@ -80,22 +78,16 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if the connection cannot be established.
-    fn connect(&self, address: SocketAddr) -> Result<()> {
+    fn connect(&self, address: SocketAddr) -> IoResult<()> {
         if address.ip().is_multicast() {
-            match address {
+            return match address {
                 SocketAddr::V4(address) => {
-                    return self
-                        .inner
-                        .join_multicast_v4(*address.ip(), *address.ip())
-                        .map_err(Error::from);
+                    self.inner.join_multicast_v4(*address.ip(), *address.ip())
                 }
-                SocketAddr::V6(address) => {
-                    return self
-                        .inner
-                        .join_multicast_v6(address.ip(), address.scope_id())
-                        .map_err(Error::from);
-                }
-            }
+                SocketAddr::V6(address) => self
+                    .inner
+                    .join_multicast_v6(address.ip(), address.scope_id()),
+            };
         }
         Ok(())
     }
@@ -107,22 +99,16 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if the connection cannot be closed.
-    fn disconnect(&self, address: SocketAddr) -> Result<()> {
+    fn disconnect(&self, address: SocketAddr) -> IoResult<()> {
         if address.ip().is_multicast() {
-            match address {
+            return match address {
                 SocketAddr::V4(address) => {
-                    return self
-                        .inner
-                        .leave_multicast_v4(*address.ip(), *address.ip())
-                        .map_err(Error::from);
+                    self.inner.leave_multicast_v4(*address.ip(), *address.ip())
                 }
-                SocketAddr::V6(address) => {
-                    return self
-                        .inner
-                        .leave_multicast_v6(address.ip(), address.scope_id())
-                        .map_err(Error::from);
-                }
-            }
+                SocketAddr::V6(address) => self
+                    .inner
+                    .leave_multicast_v6(address.ip(), address.scope_id()),
+            };
         }
         Ok(())
     }

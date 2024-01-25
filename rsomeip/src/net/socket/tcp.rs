@@ -1,6 +1,7 @@
 use crate::net::{
     socket::{Message, Operation, Packet},
-    util::BufferPool,
+    util::{BufferPool, ResponseSender},
+    IoResult,
 };
 use std::{
     collections::HashMap,
@@ -11,7 +12,7 @@ use std::{
 use tokio::{
     net::{TcpListener, TcpSocket, TcpStream},
     select,
-    sync::{mpsc, oneshot},
+    sync::mpsc,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -25,7 +26,7 @@ pub fn bind(address: SocketAddr, channels: SocketChannels) {
     });
 }
 
-/// A TCP [`Socket`] implementation.
+/// A TCP [`super::Socket`] implementation.
 #[derive(Debug)]
 struct Socket {
     address: SocketAddr,
@@ -69,9 +70,14 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if there is an issue with the TCP connection.
-    fn connect(&mut self, address: SocketAddr, packets: mpsc::Sender<Packet>, response: Response) {
+    fn connect(
+        &mut self,
+        address: SocketAddr,
+        packets: mpsc::Sender<Packet>,
+        response: ResponseSender<(), io::Error>,
+    ) {
         if self.check(&address).is_some() {
-            let _ = response.send(Ok(()));
+            response.ok(());
             return;
         }
         let local_address = self.address;
@@ -79,11 +85,11 @@ impl Socket {
         tokio::spawn(async move {
             let mut connection = match Connection::connect(local_address, address).await {
                 Ok(connection) => {
-                    let _ = response.send(Ok(()));
+                    response.ok(());
                     connection
                 }
                 Err(error) => {
-                    let _ = response.send(Err(error.into()));
+                    response.err(error);
                     return;
                 }
             };
@@ -97,13 +103,13 @@ impl Socket {
     /// # Errors
     ///
     /// Does not actually return an error.
-    fn disconnect(&mut self, address: SocketAddr, response: Response) {
+    fn disconnect(&mut self, address: SocketAddr, response: ResponseSender<(), io::Error>) {
         let _ = self.connections.remove(&address);
-        let _ = response.send(Ok(()));
+        response.ok(());
     }
 
     /// Opens the [`Socket`] to incoming TCP connections.
-    fn open(&mut self, packets: mpsc::Sender<Packet>, response: Response) {
+    fn open(&mut self, packets: mpsc::Sender<Packet>, response: ResponseSender<(), io::Error>) {
         let address = self.address;
         let listener = Listener::new(self.connections.clone());
         self.listener = Some(listener.clone());
@@ -113,11 +119,11 @@ impl Socket {
     }
 
     /// Closes the [`Socket`] to incoming TCP connections.
-    fn close(&mut self, response: Response) {
+    fn close(&mut self, response: ResponseSender<(), io::Error>) {
         if let Some(ref listener) = self.listener {
             listener.close();
         }
-        let _ = response.send(Ok(()));
+        response.ok(());
     }
 
     /// Sends the packet to its intended target.
@@ -125,13 +131,13 @@ impl Socket {
     /// # Errors
     ///
     /// Returns an error if the connection to the target is not established.
-    async fn send(&mut self, packet: Packet, response: Response) {
+    async fn send(&mut self, packet: Packet, response: ResponseSender<(), io::Error>) {
         match self.check(&packet.0) {
             Some(connection) => {
                 let _ = connection.send((packet, response)).await;
             }
             None => {
-                let _ = response.send(Err(io::Error::from(io::ErrorKind::NotConnected).into()));
+                response.err(io::ErrorKind::NotConnected.into());
             }
         }
     }
@@ -139,7 +145,10 @@ impl Socket {
     /// Returns the [`Connection`] channel for the given address.
     ///
     /// If the channel is already closed, it removes it and returns [`None`].
-    fn check(&mut self, address: &SocketAddr) -> Option<mpsc::Sender<(Packet, Response)>> {
+    fn check(
+        &mut self,
+        address: &SocketAddr,
+    ) -> Option<mpsc::Sender<(Packet, ResponseSender<(), io::Error>)>> {
         match self.connections.get(address) {
             Some(connection) => {
                 if connection.is_closed() {
@@ -191,7 +200,7 @@ impl Connection {
     async fn process(
         &mut self,
         sender: mpsc::Sender<Packet>,
-        receiver: mpsc::Receiver<(Packet, Response)>,
+        receiver: mpsc::Receiver<(Packet, ResponseSender<(), io::Error>)>,
     ) -> IoResult<()> {
         select! {
             result = self.send(receiver) => result,
@@ -204,23 +213,26 @@ impl Connection {
     /// # Errors
     ///
     /// Returns an error if there is an issue with the [`Connection`].
-    async fn send(&self, mut packets: mpsc::Receiver<(Packet, Response)>) -> IoResult<()> {
+    async fn send(
+        &self,
+        mut packets: mpsc::Receiver<(Packet, ResponseSender<(), io::Error>)>,
+    ) -> IoResult<()> {
         while let Some(((dst, buffer), response)) = packets.recv().await {
             self.stream.writable().await?;
             match self.stream.try_write(buffer.as_ref()) {
                 Ok(0) => {
                     println!("Reached end-of-file.");
-                    let _ = response.send(Ok(()));
+                    response.ok(());
                     break;
                 }
                 Ok(len) => {
                     println!("Sent {len} bytes to {dst}.");
-                    let _ = response.send(Ok(()));
+                    response.ok(());
                     continue;
                 }
                 Err(error) => {
                     eprintln!("Failed to send data to {dst}: {error}");
-                    let _ = response.send(Ok(()));
+                    response.ok(());
                     return Err(error);
                 }
             }
@@ -295,7 +307,11 @@ impl SharedConnectionMap {
     }
 
     /// Inserts a connection into the map.
-    fn insert(&self, address: SocketAddr, connection: mpsc::Sender<(Packet, Response)>) {
+    fn insert(
+        &self,
+        address: SocketAddr,
+        connection: mpsc::Sender<(Packet, ResponseSender<(), io::Error>)>,
+    ) {
         let _ = self
             .inner
             .lock()
@@ -304,7 +320,10 @@ impl SharedConnectionMap {
     }
 
     /// Returns the connection corresponding to the address, by cloning.
-    fn get(&self, address: &SocketAddr) -> Option<mpsc::Sender<(Packet, Response)>> {
+    fn get(
+        &self,
+        address: &SocketAddr,
+    ) -> Option<mpsc::Sender<(Packet, ResponseSender<(), io::Error>)>> {
         self.inner
             .lock()
             .expect("mutex should not be poisoned")
@@ -313,7 +332,10 @@ impl SharedConnectionMap {
     }
 
     /// Removes a connection from the map, returning that connection if it existed.
-    fn remove(&self, address: &SocketAddr) -> Option<mpsc::Sender<(Packet, Response)>> {
+    fn remove(
+        &self,
+        address: &SocketAddr,
+    ) -> Option<mpsc::Sender<(Packet, ResponseSender<(), io::Error>)>> {
         self.inner
             .lock()
             .expect("mutex should not be poisoned")
@@ -340,7 +362,7 @@ impl Listener {
     /// Starts processing new TCP connections until the [`Listener`] is cancelled.
     ///
     /// This function will create a [`TcpListener`] at the given address, sending back the result
-    /// through the [`Response`], and will start listening for incoming TCP connections. These
+    /// through the [`ResponseSender<(), io::Error>`], and will start listening for incoming TCP connections. These
     /// connections will be added to the [`Listener`]s [`SharedConnectionMap`].
     ///
     /// Calling [`Listener::close`] on any clone of this [`Listener`] will cause it to stop
@@ -353,16 +375,16 @@ impl Listener {
         &self,
         address: SocketAddr,
         packets: mpsc::Sender<Packet>,
-        response: Response,
+        response: ResponseSender<(), io::Error>,
     ) -> IoResult<()> {
         let listener = match TcpListener::bind(address).await {
             Ok(listener) => {
-                let _ = response.send(Ok(()));
+                response.ok(());
                 listener
             }
             Err(error) => {
                 let error_kind = error.kind();
-                let _ = response.send(Err(error.into()));
+                response.err(error);
                 return Err(error_kind.into());
             }
         };
@@ -405,16 +427,10 @@ impl Listener {
 }
 
 /// A key-value collection that maps addresses to connections.
-type ConnectionMap = HashMap<SocketAddr, mpsc::Sender<(Packet, Response)>>;
+type ConnectionMap = HashMap<SocketAddr, mpsc::Sender<(Packet, ResponseSender<(), io::Error>)>>;
 
 /// A pair of channels for receiving [`Message`]s and sending [`Packet`]s.
 type SocketChannels = (mpsc::Sender<Packet>, mpsc::Receiver<Message>);
-
-/// A specialized [Result] type for I/O operations.
-type IoResult<T> = std::io::Result<T>;
-
-/// A channel for sending the [`Result`] of [`Socket`] operations.
-type Response = oneshot::Sender<super::Result<()>>;
 
 #[cfg(test)]
 mod tests;
