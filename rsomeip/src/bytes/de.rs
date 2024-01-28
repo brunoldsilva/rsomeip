@@ -115,12 +115,6 @@ macro_rules! deserialize_basic_type {
             fn deserialize(de: &mut Deserializer) -> Result<Self> {
                 de.read().map(<$t>::from_be_bytes)
             }
-
-            fn deserialize_len(_de: &mut Deserializer, _len: LengthField) -> Result<Self> {
-                Err(Error::Message(String::from(
-                    "basic types should not include a length field",
-                )))
-            }
         }
     };
 }
