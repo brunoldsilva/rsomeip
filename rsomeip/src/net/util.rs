@@ -1,8 +1,81 @@
-use std::sync::Arc;
+use std::{
+    ops::{Deref, Range},
+    sync::Arc,
+};
 use tokio::sync::oneshot;
 
-#[cfg(test)]
-mod tests;
+/// A scoped reference into a shared byte buffer.
+#[derive(Debug, Clone)]
+pub struct Buffer {
+    inner: Arc<[u8]>,
+    range: Range<usize>,
+}
+
+impl Buffer {
+    /// Creates a new [`Buffer`].
+    #[must_use]
+    pub fn new(inner: Arc<[u8]>, range: Range<usize>) -> Self {
+        Self { inner, range }
+    }
+
+    /// Splits the [`Buffer`] into two halves, returning the first half as a new [`Buffer`], and
+    /// keeping the second half in the current [`Buffer`].
+    ///
+    /// Returns [`None`] if the given length is greater than or equal to the length of the
+    /// [`Buffer`].
+    pub fn split(&mut self, length: usize) -> Option<Self> {
+        if length >= self.len() {
+            return None;
+        }
+        let buffer = Self::new(
+            self.inner.clone(),
+            self.range.start..self.range.start + length,
+        );
+        self.range = self.range.start + length..self.range.end;
+        Some(buffer)
+    }
+
+    /// Returns the length of the [`Buffer`] in bytes.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.range.len()
+    }
+
+    /// Returns a shared reference into the given [`Buffer`].
+    pub fn get(&self) -> &[u8] {
+        self.inner[self.range.clone()].as_ref()
+    }
+
+    /// Returns a mutable reference into the given [`Buffer`], if there are no other [`Buffer`]s
+    /// with the same underlying allocation.
+    ///
+    /// Returns [`None`] otherwise, because it is not safe to mutate a shared value.
+    pub fn get_mut(&mut self) -> Option<&mut [u8]> {
+        Arc::get_mut(&mut self.inner).map(|buffer| buffer[self.range.clone()].as_mut())
+    }
+}
+
+impl Deref for Buffer {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.inner[self.range.clone()].as_ref()
+    }
+}
+
+impl<const N: usize> From<[u8; N]> for Buffer {
+    fn from(value: [u8; N]) -> Self {
+        let length = value.len();
+        Self::new(Arc::new(value), 0..length)
+    }
+}
+
+impl From<Arc<[u8]>> for Buffer {
+    fn from(value: Arc<[u8]>) -> Self {
+        let length = value.len();
+        Self::new(value, 0..length)
+    }
+}
 
 /// A pool of byte buffers that uses reference counting to keep track of available buffers.
 ///
@@ -170,3 +243,6 @@ impl<T, E> ResponseSender<T, E> {
         let _ = self.inner.send(Err(error));
     }
 }
+
+#[cfg(test)]
+mod tests;
