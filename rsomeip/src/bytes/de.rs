@@ -147,6 +147,25 @@ impl<'de> Deserializer<'de> {
     pub fn pop_limit(&mut self) -> Result<()> {
         self.limits.pop().map(|_| ()).ok_or(Error::Failure)
     }
+
+    /// Returns the amount of bytes that can be read from the current position.
+    ///
+    /// If a limit is set, it will return the distance to that limit, else it will return the
+    /// distance to the end of the buffer.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip::bytes::Deserializer;
+    /// let buffer = [0u8; 8];
+    /// let mut de = Deserializer::new(&buffer);
+    /// assert_eq!(de.remaining(), 8);
+    /// assert_eq!(de.push_limit(6), Ok(()));
+    /// assert_eq!(de.remaining(), 6);
+    /// ```
+    pub fn remaining(&self) -> usize {
+        self.limits.last().copied().unwrap_or(self.buffer.len()) - self.cursor
+    }
 }
 
 pub trait Deserialize: Sized {
