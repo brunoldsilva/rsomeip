@@ -3,15 +3,6 @@
 use super::*;
 
 #[test]
-fn new() {
-    let buf = [1u8, 2, 3, 4, 5];
-    let de = Deserializer::new(&buf);
-    assert_eq!(de.buffer, &buf);
-    assert_eq!(de.cursor, 0);
-    assert_eq!(de.limit, None);
-}
-
-#[test]
 fn read() {
     let buf = [1u8, 0, 0, 0, 2];
     let mut de = Deserializer::new(&buf);
@@ -25,25 +16,21 @@ fn read() {
 
 #[test]
 fn limit() {
-    let buf = [1u8, 0, 2, 0, 3];
+    let buf = [0u8, 1, 0, 2, 0, 3];
     let mut de = Deserializer::new(&buf);
-    assert_eq!(de.read().map(u8::from_be_bytes), Ok(1u8));
-
-    assert_eq!(de.set_limit(Some(std::mem::size_of::<u16>())), Ok(()));
-    assert_eq!(de.limit, Some(3));
-
-    assert_eq!(de.read().map(u16::from_be_bytes), Ok(2u16));
-    assert_eq!(de.read().map(u16::from_be_bytes), Err(Error::ExceedsLimit));
-    assert_eq!(de.cursor, 3);
-
-    assert_eq!(de.set_limit(None), Ok(()));
-    assert_eq!(de.read().map(u16::from_be_bytes), Ok(3u16));
-    assert_eq!(de.cursor, 5);
-
+    assert_eq!(de.push_limit(buf.len() + 1), Err(Error::BufferOverflow));
+    assert_eq!(de.push_limit(std::mem::size_of::<u32>()), Ok(()));
     assert_eq!(
-        de.set_limit(Some(std::mem::size_of::<u16>())),
-        Err(Error::BufferOverflow)
+        de.push_limit(std::mem::size_of::<u64>()),
+        Err(Error::ExceedsLimit)
     );
+    assert_eq!(de.push_limit(std::mem::size_of::<u16>()), Ok(()));
+
+    assert_eq!(de.read().map(u16::from_be_bytes), Ok(1u16));
+    assert_eq!(de.read().map(u16::from_be_bytes), Err(Error::ExceedsLimit));
+
+    assert_eq!(de.pop_limit(), Ok(()));
+    assert_eq!(de.read().map(u16::from_be_bytes), Ok(2u16));
 }
 
 macro_rules! test_deserialize_basic_type {

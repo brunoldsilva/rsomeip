@@ -1,90 +1,220 @@
-#![cfg(test)]
-
+use self::bytes::{Deserialize, Serialize};
 use super::*;
 
 #[test]
-fn new() {
-    assert_eq!(Payload::new(), Payload::default());
+fn message_new() {
+    let message = Message::<u32>::new(0x1234, 0x5678, 0x90ab_1234);
+    assert_eq!(message.service(), 0x1234);
+    assert_eq!(message.method(), 0x5678);
+    assert_eq!(*message.payload(), 0x90ab_1234);
 }
 
 #[test]
-fn default() {
-    let payload = Payload::default();
-    assert_eq!(payload.client_id, 0);
-    assert_eq!(payload.session_id, 0);
-    assert_eq!(payload.protocol_version, 1);
-    assert_eq!(payload.interface_version, 0);
-    assert_eq!(payload.message_type, MessageType::Request);
-    assert_eq!(payload.return_code, ReturnCode::Ok);
+fn message_default() {
+    let message = Message::<u32>::default();
+    assert_eq!(message.service(), 0);
+    assert_eq!(message.method(), 0);
+    assert_eq!(*message.payload(), 0);
 }
 
 #[test]
-fn display() {
-    let payload = Payload::builder()
-        .client_id(0x0012)
-        .session_id(0x00ab)
-        .data(vec![1, 2, 3, 4])
-        .build();
-    assert_eq!(payload.to_string(), "[0012.00ab]{4}");
+fn message_accessors() {
+    let mut message = Message::<u32>::default();
+    message.set_service(0x1234);
+    message.set_method(0x5678);
+    message.set_payload(0x90ab_1234);
+    assert_eq!(message.service(), 0x1234);
+    assert_eq!(message.method(), 0x5678);
+    assert_eq!(message.id(), 0x1234_5678);
+    assert_eq!(*message.payload(), 0x90ab_1234);
+    message.set_id(0x90ab_1234);
+    assert_eq!(message.id(), 0x90ab_1234);
 }
 
-#[test]
-fn build() {
-    let payload = Payload::builder()
-        .client_id(0xdef0)
-        .session_id(0x1234)
-        .protocol_version(2)
-        .interface_version(3)
-        .message_type(MessageType::Error)
-        .return_code(ReturnCode::NotOk)
-        .data(vec![1, 2, 3, 4])
-        .build();
-    assert_eq!(payload.client_id, 0xdef0);
-    assert_eq!(payload.session_id, 0x1234);
-    assert_eq!(payload.protocol_version, 2);
-    assert_eq!(payload.interface_version, 3);
-    assert_eq!(payload.message_type, MessageType::Error);
-    assert_eq!(payload.return_code, ReturnCode::NotOk);
-    assert_eq!(payload.data, vec![1, 2, 3, 4]);
-}
-
-const SERIALIZED_PAYLOAD: [u8; 12] = [
-    0x12, 0x34, 0x56, 0x78, 0x02, 0x03, 0x81, 0x01, 0x01, 0x02, 0x03, 0x04,
+const SERIALIZED_MESSAGE: [u8; 12] = [
+    0x12, 0x34, // ServiceId
+    0x56, 0x78, // MethodId
+    0x00, 0x00, 0x00, 0x04, // Payload Length
+    0x11, 0x11, 0x22, 0x22, // Payload
 ];
 
 #[test]
-fn serialize_payload() {
-    let mut buf = [0u8; 12];
-    let mut ser = bytes::Serializer::new(&mut buf);
-    let payload = Payload::builder()
-        .client_id(0x1234)
-        .session_id(0x5678)
-        .protocol_version(2)
-        .interface_version(3)
-        .message_type(MessageType::Error)
-        .return_code(ReturnCode::NotOk)
-        .data(vec![1, 2, 3, 4])
-        .build();
-    assert_eq!(payload.serialize(&mut ser), Ok(()));
-    assert_eq!(buf, SERIALIZED_PAYLOAD);
+fn message_serialize() {
+    let mut buffer = [0u8; 12];
+    let mut ser = bytes::Serializer::new(buffer.as_mut());
+    let message = Message::new(0x1234, 0x5678, 0x1111_2222_u32);
+    assert_eq!(message.serialize(&mut ser), Ok(()));
+    assert_eq!(buffer, SERIALIZED_MESSAGE);
 }
 
 #[test]
-fn deserialize_payload() {
-    let buf = SERIALIZED_PAYLOAD;
-    let mut de = bytes::Deserializer::new(&buf);
-    assert_eq!(de.set_limit(Some(12)), Ok(()));
-    let result = Payload::deserialize(&mut de);
-    let expected = Payload::builder()
-        .client_id(0x1234)
-        .session_id(0x5678)
-        .protocol_version(2)
-        .interface_version(3)
-        .message_type(MessageType::Error)
+fn message_deserialize() {
+    let buffer = SERIALIZED_MESSAGE;
+    let mut de = bytes::Deserializer::new(buffer.as_ref());
+    let message = Message::<u32>::deserialize(&mut de);
+    assert_eq!(message, Ok(Message::new(0x1234, 0x5678, 0x1111_2222_u32)));
+}
+
+#[test]
+fn message_display() {
+    let message = Message::<u32>::new(0x1234, 0x5678, 0x1111_2222);
+    assert_eq!(message.to_string(), "[M.1234.5678]");
+}
+
+#[test]
+fn request_new() {
+    let request = Request::new(0x1234_5678_u32);
+    assert_eq!(
+        request,
+        Request {
+            client: 0,
+            session: 0,
+            protocol: 1,
+            interface: 0,
+            message_type: MessageType::Request,
+            return_code: ReturnCode::Ok,
+            payload: 0x1234_5678_u32
+        }
+    );
+}
+
+#[test]
+fn request_build() {
+    assert_eq!(
+        Request::build(0x1234_5678_u32).get(),
+        Request::new(0x1234_5678_u32)
+    );
+}
+
+#[test]
+fn request_accessors() {
+    let mut request = Request::new(0x1234_5678_u32);
+    request.set_client(0x1234);
+    request.set_session(0x5678);
+    request.set_protocol(0xab);
+    request.set_interface(0xcd);
+    request.set_message_type(MessageType::Response);
+    request.set_return_code(ReturnCode::NotOk);
+    assert_eq!(request.client(), 0x1234);
+    assert_eq!(request.session(), 0x5678);
+    assert_eq!(request.protocol(), 0xab);
+    assert_eq!(request.interface(), 0xcd);
+    assert_eq!(request.message_type(), MessageType::Response);
+    assert_eq!(request.return_code(), ReturnCode::NotOk);
+    request.set_id(0x1111_2222);
+    assert_eq!(request.id(), 0x1111_2222);
+}
+
+const SERIALIZED_REQUEST: [u8; 12] = [
+    0x12, 0x34, // ClientId
+    0x56, 0x78, // SessionId
+    0xab, // Protocol Version
+    0xcd, // Interface Version
+    0x80, // MessageType
+    0x01, // ReturnCode
+    0x11, 0x11, 0x22, 0x22, // Payload
+];
+
+#[test]
+fn request_serialize() {
+    let mut buffer = [0u8; 12];
+    let mut ser = bytes::Serializer::new(buffer.as_mut());
+    let request = RequestBuilder::new(0x1111_2222_u32)
+        .client(0x1234)
+        .session(0x5678)
+        .protocol(0xab)
+        .interface(0xcd)
+        .message_type(MessageType::Response)
         .return_code(ReturnCode::NotOk)
-        .data(vec![1, 2, 3, 4])
-        .build();
-    assert_eq!(result, Ok(expected));
+        .get();
+    assert_eq!(request.serialize(&mut ser), Ok(()));
+    assert_eq!(buffer, SERIALIZED_REQUEST);
+}
+
+#[test]
+fn request_deserialize() {
+    let buffer = SERIALIZED_REQUEST;
+    let mut de = bytes::Deserializer::new(buffer.as_ref());
+    let request = Request::<u32>::deserialize(&mut de);
+    assert_eq!(
+        request,
+        Ok(RequestBuilder::new(0x1111_2222_u32)
+            .client(0x1234)
+            .session(0x5678)
+            .protocol(0xab)
+            .interface(0xcd)
+            .message_type(MessageType::Response)
+            .return_code(ReturnCode::NotOk)
+            .get())
+    );
+}
+
+#[test]
+fn request_display() {
+    let request = RequestBuilder::new(0x1234_5678_u32)
+        .client(0x1234)
+        .session(0x5678)
+        .message_type(MessageType::Response)
+        .return_code(ReturnCode::NotOk)
+        .get();
+    assert_eq!(request.to_string(), "[R.1234.5678.80.01]");
+}
+
+#[test]
+fn request_builder_new() {
+    let request = RequestBuilder::new(0x1234_5678_u32).get();
+    assert_eq!(
+        request,
+        Request {
+            client: 0,
+            session: 0,
+            protocol: 1,
+            interface: 0,
+            message_type: MessageType::Request,
+            return_code: ReturnCode::Ok,
+            payload: 0x1234_5678_u32
+        }
+    );
+}
+
+#[test]
+fn request_builder_build() {
+    let request = RequestBuilder::new(0x1234_5678_u32)
+        .client(0x1234)
+        .session(0x5678)
+        .protocol(0x9a)
+        .interface(0xbc)
+        .message_type(MessageType::Response)
+        .return_code(ReturnCode::NotOk)
+        .payload(0x1111_2222_u32)
+        .get();
+    assert_eq!(
+        request,
+        Request {
+            client: 0x1234,
+            session: 0x5678,
+            protocol: 0x9a,
+            interface: 0xbc,
+            message_type: MessageType::Response,
+            return_code: ReturnCode::NotOk,
+            payload: 0x1111_2222_u32
+        }
+    );
+}
+
+#[test]
+fn message_type_serialize() {
+    let mut buffer = [0u8; 1];
+    let mut ser = bytes::Serializer::new(buffer.as_mut());
+    assert_eq!(MessageType::Response.serialize(&mut ser), Ok(()));
+    assert_eq!(buffer, [0x80_u8]);
+}
+
+#[test]
+fn message_type_deserialize() {
+    let buffer = [0x80_u8];
+    let mut de = bytes::Deserializer::new(buffer.as_ref());
+    assert_eq!(MessageType::deserialize(&mut de), Ok(MessageType::Response));
 }
 
 #[test]
@@ -119,6 +249,21 @@ fn u8_from_message_type() {
     (u8::MIN..=u8::MAX)
         .filter(|x| ![0x00, 0x01, 0x02, 0x80, 0x81, 0x20, 0x21, 0x22, 0xa0, 0xa1].contains(x))
         .for_each(|x| assert_eq!(u8::from(MessageType::Unknown(x)), x));
+}
+
+#[test]
+fn return_code_serialize() {
+    let mut buffer = [0u8; 1];
+    let mut ser = bytes::Serializer::new(buffer.as_mut());
+    assert_eq!(ReturnCode::NotOk.serialize(&mut ser), Ok(()));
+    assert_eq!(buffer, [0x01_u8]);
+}
+
+#[test]
+fn return_code_deserialize() {
+    let buffer = [0x01_u8];
+    let mut de = bytes::Deserializer::new(buffer.as_ref());
+    assert_eq!(ReturnCode::deserialize(&mut de), Ok(ReturnCode::NotOk));
 }
 
 #[test]

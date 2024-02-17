@@ -1,181 +1,411 @@
-use crate::bytes::{self, Deserialize, Serialize};
-use std::fmt::Display;
+//! Common types of the SOME/IP protocol.
 
-mod tests;
+use crate::bytes::{self};
 
-/// The raw message data with some additional parameters.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Payload {
-    pub client_id: u16,
-    pub session_id: u16,
-    pub protocol_version: u8,
-    pub interface_version: u8,
-    pub message_type: MessageType,
-    pub return_code: ReturnCode,
-    pub data: Vec<u8>,
+/// A payload addressed to a method of a service.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Message<T> {
+    service: ServiceId,
+    method: MethodId,
+    payload: T,
 }
 
-impl Payload {
-    /// Creates a new [`Payload`].
-    pub fn new() -> Self {
-        Self::default()
+impl<T> Message<T> {
+    /// Creates a new [`Message`].
+    #[must_use]
+    pub const fn new(service: ServiceId, method: MethodId, payload: T) -> Self {
+        Self {
+            service,
+            method,
+            payload,
+        }
     }
 
-    /// Creates a [`PayloadBuilder`] help build a new payload.
-    pub fn builder() -> PayloadBuilder {
-        PayloadBuilder::new()
+    /// Returns the [`MessageId`] of this [`Message`].
+    pub fn id(&self) -> MessageId {
+        #![allow(clippy::cast_lossless)] // Lossy conversion is fine.
+        ((self.service() as MessageId) << 16) | (self.method() as MessageId)
+    }
+
+    /// Sets the [`MessageId`] of this [`Message`].
+    pub fn set_id(&mut self, id: MessageId) {
+        #![allow(clippy::cast_possible_truncation)] // Truncation is intended.
+        self.set_service((id >> 16) as ServiceId);
+        self.set_method((id & 0xffff) as MethodId);
+    }
+
+    /// Returns the [`ServiceId`] of this [`Message`].
+    pub fn service(&self) -> ServiceId {
+        self.service
+    }
+
+    /// Sets the [`ServiceId`] of this [`Message`].
+    pub fn set_service(&mut self, service: ServiceId) {
+        self.service = service;
+    }
+
+    /// Returns the [`MethodId`] of this [`Message`].
+    pub fn method(&self) -> MethodId {
+        self.method
+    }
+
+    /// Sets the [`MethodId`] of this [`Message`].
+    pub fn set_method(&mut self, method: MethodId) {
+        self.method = method;
+    }
+
+    /// Returns a reference to the payload of this [`Message`].
+    pub fn payload(&self) -> &T {
+        &self.payload
+    }
+
+    /// Sets the payload of this [`Message`].
+    pub fn set_payload(&mut self, payload: T) {
+        self.payload = payload;
     }
 }
 
-impl Serialize for Payload {
+impl<T> bytes::Serialize for Message<T>
+where
+    T: bytes::Serialize,
+{
     fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
-        self.client_id.serialize(ser)?;
-        self.session_id.serialize(ser)?;
-        self.protocol_version.serialize(ser)?;
-        self.interface_version.serialize(ser)?;
-        self.message_type.serialize(ser)?;
-        self.return_code.serialize(ser)?;
-        self.data.serialize(ser)
+        self.id().serialize(ser)?;
+        self.payload().serialize_len(ser, bytes::LengthField::U32)
     }
 }
 
-impl Deserialize for Payload {
+impl<T> bytes::Deserialize for Message<T>
+where
+    T: bytes::Deserialize,
+{
     fn deserialize(de: &mut bytes::Deserializer) -> bytes::Result<Self> {
         Ok(Self {
-            client_id: u16::deserialize(de)?,
-            session_id: u16::deserialize(de)?,
-            protocol_version: u8::deserialize(de)?,
-            interface_version: u8::deserialize(de)?,
-            message_type: MessageType::deserialize(de)?,
-            return_code: ReturnCode::deserialize(de)?,
-            data: Vec::deserialize(de)?,
+            service: ClientId::deserialize(de)?,
+            method: MethodId::deserialize(de)?,
+            payload: T::deserialize_len(de, bytes::LengthField::U32)?,
         })
     }
 }
 
-impl Default for Payload {
+impl<T> Default for Message<T>
+where
+    T: Default,
+{
     fn default() -> Self {
         Self {
-            client_id: u16::default(),
-            session_id: u16::default(),
-            protocol_version: 0x01_u8,
-            interface_version: u8::default(),
-            message_type: MessageType::default(),
-            return_code: ReturnCode::default(),
-            data: Vec::default(),
+            service: Default::default(),
+            method: Default::default(),
+            payload: Default::default(),
         }
     }
 }
 
-impl Display for Payload {
+impl<T> std::fmt::Display for Message<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[M.{:04x?}.{:04x?}]", self.service(), self.method())
+    }
+}
+
+impl<T> Clone for Message<T>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            service: self.service,
+            method: self.method,
+            payload: self.payload.clone(),
+        }
+    }
+}
+
+/// Additional payload metadata for a SOME/IP [`Message`].
+#[derive(Debug, PartialEq, Eq)]
+pub struct Request<T> {
+    client: ClientId,
+    session: SessionId,
+    protocol: ProtocolVersion,
+    interface: InterfaceVersion,
+    message_type: MessageType,
+    return_code: ReturnCode,
+    payload: T,
+}
+
+impl<T> Request<T> {
+    /// Creates a new [`Request`].
+    #[must_use]
+    pub fn new(payload: T) -> Self {
+        Self {
+            client: 0,
+            session: 0,
+            protocol: 1,
+            interface: 0,
+            message_type: MessageType::Request,
+            return_code: ReturnCode::Ok,
+            payload,
+        }
+    }
+
+    /// Returns a new [`RequestBuilder`].
+    #[must_use]
+    pub fn build(payload: T) -> RequestBuilder<T> {
+        RequestBuilder::new(payload)
+    }
+
+    /// Returns the [`RequestId`] of this [`Request`].
+    pub fn id(&self) -> RequestId {
+        #![allow(clippy::cast_lossless)] // Lossy conversion is fine.
+        ((self.client() as RequestId) << 16) | (self.session() as RequestId)
+    }
+
+    /// Sets the [`RequestId`] of this [`Request`].
+    pub fn set_id(&mut self, request: RequestId) {
+        #![allow(clippy::cast_possible_truncation)] // Truncation is intended.
+        self.set_client((request >> 16) as ClientId);
+        self.set_session((request & 0xffff) as SessionId);
+    }
+
+    /// Returns the [`ClientId`] of this [`Request`].
+    pub fn client(&self) -> ClientId {
+        self.client
+    }
+
+    /// Sets the [`ClientId`] of this [`Request`].
+    pub fn set_client(&mut self, client: ClientId) {
+        self.client = client;
+    }
+
+    /// Returns the [`SessionId`] of this [`Request`].
+    pub fn session(&self) -> SessionId {
+        self.session
+    }
+
+    /// Sets the [`SessionId`] of this [`Request`].
+    pub fn set_session(&mut self, session: SessionId) {
+        self.session = session;
+    }
+
+    /// Returns the [`ProtocolVersion`] of this [`Request`].
+    pub fn protocol(&self) -> ProtocolVersion {
+        self.protocol
+    }
+
+    /// Sets the [`ProtocolVersion`] of this [`Request`].
+    pub fn set_protocol(&mut self, protocol: ProtocolVersion) {
+        self.protocol = protocol;
+    }
+
+    /// Returns the [`InterfaceVersion`] of this [`Request`].
+    pub fn interface(&self) -> InterfaceVersion {
+        self.interface
+    }
+
+    /// Sets the [`InterfaceVersion`] of this [`Request`].
+    pub fn set_interface(&mut self, interface: InterfaceVersion) {
+        self.interface = interface;
+    }
+
+    /// Returns the [`MessageType`] of this [`Request`].
+    pub fn message_type(&self) -> MessageType {
+        self.message_type
+    }
+
+    /// Sets the [`MessageType`] of this [`Request`].
+    pub fn set_message_type(&mut self, message_type: MessageType) {
+        self.message_type = message_type;
+    }
+
+    /// Returns the [`ReturnCode`] of this [`Request`].
+    pub fn return_code(&self) -> ReturnCode {
+        self.return_code
+    }
+
+    /// Sets the [`ReturnCode`] of this [`Request`].
+    pub fn set_return_code(&mut self, return_code: ReturnCode) {
+        self.return_code = return_code;
+    }
+
+    /// Returns a reference to the payload of this [`Request`].
+    pub fn payload(&self) -> &T {
+        &self.payload
+    }
+
+    /// Sets the payload of this [`Request`].
+    pub fn set_payload(&mut self, payload: T) {
+        self.payload = payload;
+    }
+}
+
+impl<T> bytes::Serialize for Request<T>
+where
+    T: bytes::Serialize,
+{
+    fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
+        self.id().serialize(ser)?;
+        self.protocol().serialize(ser)?;
+        self.interface().serialize(ser)?;
+        self.message_type().serialize(ser)?;
+        self.return_code().serialize(ser)?;
+        self.payload().serialize(ser)
+    }
+}
+
+impl<T> bytes::Deserialize for Request<T>
+where
+    T: bytes::Deserialize,
+{
+    fn deserialize(de: &mut bytes::Deserializer) -> bytes::Result<Self> {
+        Ok(Self {
+            client: ClientId::deserialize(de)?,
+            session: SessionId::deserialize(de)?,
+            protocol: ProtocolVersion::deserialize(de)?,
+            interface: InterfaceVersion::deserialize(de)?,
+            message_type: MessageType::deserialize(de)?,
+            return_code: ReturnCode::deserialize(de)?,
+            payload: T::deserialize(de)?,
+        })
+    }
+}
+
+impl<T> Default for Request<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
+impl<T> std::fmt::Display for Request<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "[{:04x}.{:04x}]{{{}}}",
-            self.client_id,
-            self.session_id,
-            self.data.len()
+            "[R.{:04x?}.{:04x?}.{:02x?}.{:02x?}]",
+            self.client(),
+            self.session(),
+            u8::from(self.message_type()),
+            u8::from(self.return_code())
         )
     }
 }
 
-/// A helper for constructing a [`Payload`] step-by-step.
-///
-/// # Examples
-///
-/// Basic usage:
-///
-/// ```
-/// use rsomeip::someip::Payload;
-/// let payload = Payload::builder()
-///     .client_id(0x1234)
-///     .session_id(0x5678)
-///     .build();
-/// ```
-#[derive(Debug, Default)]
-pub struct PayloadBuilder {
-    inner: Payload,
+impl<T> Clone for Request<T>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            payload: self.payload.clone(),
+            ..(*self)
+        }
+    }
 }
 
-impl PayloadBuilder {
-    /// Creates a new [`PayloadBuilder`].
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+/// Utility for build [`Request`]s using the builder pattern.
+#[derive(Debug)]
+pub struct RequestBuilder<T> {
+    inner: Request<T>,
+}
+
+impl<T> RequestBuilder<T> {
+    /// Creates a new [`RequestBuilder`].
+    pub fn new(payload: T) -> Self {
+        Self {
+            inner: Request::new(payload),
+        }
     }
 
-    /// Consumes the builder to get the constructed payload.
-    #[must_use]
-    pub fn build(self) -> Payload {
+    /// Returns the [`Request`] that is being built, consuming the [`RequestBuilder`].
+    pub fn get(self) -> Request<T> {
         self.inner
     }
 
-    /// Sets the client id.
+    /// Sets the [`RequestId`] of the [`Request`].
     #[must_use]
-    pub fn client_id(mut self, value: u16) -> Self {
-        self.inner.client_id = value;
+    pub fn id(mut self, value: RequestId) -> Self {
+        self.inner.set_id(value);
         self
     }
 
-    /// Sets the session id.
+    /// Sets the [`ClientId`] of the [`Request`].
     #[must_use]
-    pub fn session_id(mut self, value: u16) -> Self {
-        self.inner.session_id = value;
+    pub fn client(mut self, value: ClientId) -> Self {
+        self.inner.set_client(value);
         self
     }
 
-    /// Sets the protocol version.
+    /// Sets the [`SessionId`] of the [`Request`].
     #[must_use]
-    pub fn protocol_version(mut self, value: u8) -> Self {
-        self.inner.protocol_version = value;
+    pub fn session(mut self, value: SessionId) -> Self {
+        self.inner.set_session(value);
         self
     }
 
-    /// Sets the interface version.
+    /// Sets the [`ProtocolVersion`] of the [`Request`].
     #[must_use]
-    pub fn interface_version(mut self, value: u8) -> Self {
-        self.inner.interface_version = value;
+    pub fn protocol(mut self, value: ProtocolVersion) -> Self {
+        self.inner.set_protocol(value);
         self
     }
 
-    /// Sets the message type.
+    /// Sets the [`InterfaceVersion`] of the [`Request`].
+    #[must_use]
+    pub fn interface(mut self, value: InterfaceVersion) -> Self {
+        self.inner.set_interface(value);
+        self
+    }
+
+    /// Sets the [`MessageType`] of the [`Request`].
     #[must_use]
     pub fn message_type(mut self, value: MessageType) -> Self {
-        self.inner.message_type = value;
+        self.inner.set_message_type(value);
         self
     }
 
-    /// Sets the return code.
+    /// Sets the [`ReturnCode`] of the [`Request`].
     #[must_use]
     pub fn return_code(mut self, value: ReturnCode) -> Self {
-        self.inner.return_code = value;
+        self.inner.set_return_code(value);
         self
     }
 
-    /// Sets the raw payload data.
+    /// Sets the payload of the [`Request`].
     #[must_use]
-    pub fn data(mut self, value: Vec<u8>) -> Self {
-        self.inner.data = value;
+    pub fn payload(mut self, value: T) -> Self {
+        self.inner.set_payload(value);
         self
     }
 }
 
-/// Used to differentiate different types of messages.
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// Identifies the type of message.
+#[non_exhaustive]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum MessageType {
     #[default]
-    Request = 0x00,
-    RequestNoReturn = 0x01,
-    Notification = 0x02,
-    Response = 0x80,
-    Error = 0x81,
-    TpRequest = 0x20,
-    TpRequestNoReturn = 0x21,
-    TpNotification = 0x22,
-    TpResponse = 0xa0,
-    TpError = 0xa1,
+    Request,
+    RequestNoReturn,
+    Notification,
+    Response,
+    Error,
+    TpRequest,
+    TpRequestNoReturn,
+    TpNotification,
+    TpResponse,
+    TpError,
     Unknown(u8),
+}
+
+impl bytes::Serialize for MessageType {
+    fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
+        u8::from(*self).serialize(ser)
+    }
+}
+
+impl bytes::Deserialize for MessageType {
+    fn deserialize(de: &mut bytes::Deserializer) -> bytes::Result<Self> {
+        Ok(Self::from(u8::deserialize(de)?))
+    }
 }
 
 impl From<u8> for MessageType {
@@ -214,41 +444,41 @@ impl From<MessageType> for u8 {
     }
 }
 
-impl bytes::Serialize for MessageType {
+/// Identifies the result of the request.
+#[non_exhaustive]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum ReturnCode {
+    #[default]
+    Ok,
+    NotOk,
+    UnknownService,
+    UnknownMethod,
+    NotReady,
+    NotReachable,
+    Timeout,
+    WrongProtocolVersion,
+    WrongInterfaceVersion,
+    MalformedMessage,
+    WrongMessageType,
+    E2eRepeated,
+    E2eWrongSequence,
+    E2e,
+    E2eNotAvailable,
+    E2eNoNewData,
+    Reserved(u8),
+    Unknown(u8),
+}
+
+impl bytes::Serialize for ReturnCode {
     fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
         u8::from(*self).serialize(ser)
     }
 }
 
-impl bytes::Deserialize for MessageType {
+impl bytes::Deserialize for ReturnCode {
     fn deserialize(de: &mut bytes::Deserializer) -> bytes::Result<Self> {
-        u8::deserialize(de).map(Self::from)
+        Ok(Self::from(u8::deserialize(de)?))
     }
-}
-
-/// Used to signal whether a request was successfully processed.
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ReturnCode {
-    #[default]
-    Ok = 0x00,
-    NotOk = 0x01,
-    UnknownService = 0x02,
-    UnknownMethod = 0x03,
-    NotReady = 0x04,
-    NotReachable = 0x05,
-    Timeout = 0x06,
-    WrongProtocolVersion = 0x07,
-    WrongInterfaceVersion = 0x08,
-    MalformedMessage = 0x09,
-    WrongMessageType = 0x0a,
-    E2eRepeated = 0x0b,
-    E2eWrongSequence = 0x0c,
-    E2e = 0x0d,
-    E2eNotAvailable = 0x0e,
-    E2eNoNewData = 0x0f,
-    Reserved(u8),
-    Unknown(u8),
 }
 
 impl From<u8> for ReturnCode {
@@ -300,14 +530,29 @@ impl From<ReturnCode> for u8 {
     }
 }
 
-impl bytes::Serialize for ReturnCode {
-    fn serialize(&self, ser: &mut bytes::Serializer) -> bytes::Result<()> {
-        u8::from(*self).serialize(ser)
-    }
-}
+/// Identifier of a method of a service.
+pub type MessageId = u32;
 
-impl bytes::Deserialize for ReturnCode {
-    fn deserialize(de: &mut bytes::Deserializer) -> bytes::Result<Self> {
-        u8::deserialize(de).map(Self::from)
-    }
-}
+/// Identifier of a service interface.
+pub type ServiceId = u16;
+
+/// Identifier of a method or event.
+pub type MethodId = u16;
+
+/// Identifier of a request.
+pub type RequestId = u32;
+
+/// Identifier of the client that sent the request.
+pub type ClientId = u16;
+
+/// Identifier of the request in a sequence.
+pub type SessionId = u16;
+
+/// Major version of the SOME/IP protocol being used.
+pub type ProtocolVersion = u8;
+
+/// Major version of the service referenced by the [`ServiceId`].
+pub type InterfaceVersion = u8;
+
+#[cfg(test)]
+mod tests;
