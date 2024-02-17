@@ -1,13 +1,12 @@
 use crate::net::{
     socket::{Message, Operation, Packet},
-    util::{BufferPool, ResponseSender},
+    util::{BufferPool, ResponseSender, SharedMap},
     IoResult,
 };
 use std::{
-    collections::HashMap,
     io,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 use tokio::{
     net::{TcpListener, TcpSocket, TcpStream},
@@ -30,7 +29,7 @@ pub fn bind(address: SocketAddr, channels: SocketChannels) {
 #[derive(Debug)]
 struct Socket {
     address: SocketAddr,
-    connections: SharedConnectionMap,
+    connections: ConnectionMap,
     listener: Option<Listener>,
 }
 
@@ -40,7 +39,7 @@ impl Socket {
     fn new(address: SocketAddr) -> Self {
         Self {
             address,
-            connections: SharedConnectionMap::new(),
+            connections: ConnectionMap::new(),
             listener: None,
         }
     }
@@ -95,7 +94,7 @@ impl Socket {
             };
             let _ = connection.process(packets, receiver).await;
         });
-        self.connections.insert(address, sender);
+        let _ = self.connections.insert(address, sender);
     }
 
     /// Closes the TCP connection to the given address.
@@ -293,66 +292,16 @@ impl Connection {
     }
 }
 
-/// A thread-safe [`ConnectionMap`].
-#[derive(Debug, Default, Clone)]
-struct SharedConnectionMap {
-    inner: Arc<Mutex<ConnectionMap>>,
-}
-
-#[allow(clippy::expect_used)] // We expect to panic when we find a poisoned mutex.
-impl SharedConnectionMap {
-    /// Creates a new [`SharedConnectionMap`].
-    fn new() -> Self {
-        Self::default()
-    }
-
-    /// Inserts a connection into the map.
-    fn insert(
-        &self,
-        address: SocketAddr,
-        connection: mpsc::Sender<(Packet, ResponseSender<(), io::Error>)>,
-    ) {
-        let _ = self
-            .inner
-            .lock()
-            .expect("mutex should not be poisoned")
-            .insert(address, connection);
-    }
-
-    /// Returns the connection corresponding to the address, by cloning.
-    fn get(
-        &self,
-        address: &SocketAddr,
-    ) -> Option<mpsc::Sender<(Packet, ResponseSender<(), io::Error>)>> {
-        self.inner
-            .lock()
-            .expect("mutex should not be poisoned")
-            .get(address)
-            .cloned()
-    }
-
-    /// Removes a connection from the map, returning that connection if it existed.
-    fn remove(
-        &self,
-        address: &SocketAddr,
-    ) -> Option<mpsc::Sender<(Packet, ResponseSender<(), io::Error>)>> {
-        self.inner
-            .lock()
-            .expect("mutex should not be poisoned")
-            .remove(address)
-    }
-}
-
 /// A listener for incoming TCP connections.
 #[derive(Debug, Clone)]
 struct Listener {
-    connections: SharedConnectionMap,
+    connections: ConnectionMap,
     token: CancellationToken,
 }
 
 impl Listener {
     /// Creates a new [`Listener`].
-    fn new(connections: SharedConnectionMap) -> Self {
+    fn new(connections: ConnectionMap) -> Self {
         Self {
             connections,
             token: CancellationToken::new(),
@@ -426,8 +375,8 @@ impl Listener {
     }
 }
 
-/// A key-value collection that maps addresses to connections.
-type ConnectionMap = HashMap<SocketAddr, mpsc::Sender<(Packet, ResponseSender<(), io::Error>)>>;
+/// A thread-safe map of addresses to connections.
+type ConnectionMap = SharedMap<SocketAddr, mpsc::Sender<(Packet, ResponseSender<(), io::Error>)>>;
 
 /// A pair of channels for receiving [`Message`]s and sending [`Packet`]s.
 type SocketChannels = (mpsc::Sender<Packet>, mpsc::Receiver<Message>);
