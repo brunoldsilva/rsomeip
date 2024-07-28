@@ -21,6 +21,7 @@ function install_prerequisites() {
     echo 'coverage.rs: installing prerequisites'
     check_rustup
     install_llvm_tools
+    install_grcov
 }
 
 # Checks if rustup is installed.
@@ -36,6 +37,14 @@ function install_llvm_tools() {
     if ! rustup component add llvm-tools; then
         echo 'coverage.rs: error: failed to install llvm-tools' >&2
         exit 1
+    fi
+}
+
+# Installs grcov using cargo.
+function install_grcov() {
+    if ! command -v grcov &> /dev/null; then
+        echo 'coverage.rs: installing grcov from source'
+        cargo install --locked grcov
     fi
 }
 
