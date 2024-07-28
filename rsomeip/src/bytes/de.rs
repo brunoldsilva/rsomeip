@@ -2,59 +2,79 @@ use super::{Error, LengthField, Result};
 
 mod tests;
 
+/// Extracts data from a byte buffer in sequential order.
+///
+/// Using [`Deserializer::read`], any type that implements [`TryFrom`] for `&[u8]` can be safely
+/// extracted, provided that there is enough data in the buffer.
+///
+/// Arbitrary limits can be set with [`Deserializer::push_limit`], and removed with
+/// [`Deserializer::pop_limit`], to further control the amount of bytes that can be read at any
+/// given time.
 pub struct Deserializer<'de> {
     buffer: &'de [u8],
     cursor: usize,
-    limit: Option<usize>,
+    limits: Vec<usize>,
 }
 
 impl<'de> Deserializer<'de> {
-    /// Create a new [`Deserializer`] with the given byte buffer.
+    /// Create a new [`Deserializer`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip::bytes::{Deserialize, Deserializer, Error};
+    /// let buffer: [u8; 2] = [0x01, 0x02];
+    /// let mut de = Deserializer::new(&buffer);
+    /// assert_eq!(u16::deserialize(&mut de), Ok(0x0102));
+    /// ```
     #[must_use]
     pub fn new(buffer: &'de [u8]) -> Self {
         Self {
             buffer,
             cursor: 0,
-            limit: None,
+            limits: Vec::default(),
         }
     }
 
-    /// Creates a new [`Deserializer`] with an optional byte limit.
+    /// Reads a value of type `T` from the buffer, and advances the read position accordingly.
     ///
-    /// This method creates a new [`Deserializer`] that shares the same underlying buffer
-    /// with the current instance but imposes an optional limit on the number of bytes
-    /// that can be read. The limit is specified as an offset from the current cursor
-    /// position.
+    /// Does bounds checking to prevent reading past any set limit, or the end of the buffer.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```rust
+    /// use rsomeip::bytes::{Deserializer, Error};
+    /// let buffer: [u8; 7] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    /// let mut de = Deserializer::new(&buffer);
+    /// assert_eq!(de.read().map(u8::from_be_bytes), Ok(0x01_u8));
+    /// assert_eq!(de.read().map(u16::from_be_bytes), Ok(0x0203_u16));
+    /// assert_eq!(de.read().map(u32::from_be_bytes), Ok(0x0405_0607_u32));
+    /// assert_eq!(de.read().map(u16::from_be_bytes), Err(Error::BufferOverflow));
+    /// ```
+    ///
+    /// However, in most cases, you'll want to use the [`Deserialize`] trait instead:
+    ///
+    /// ```rust
+    /// use rsomeip::bytes::{Deserialize, Deserializer, Error};
+    /// let buffer: [u8; 7] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    /// let mut de = Deserializer::new(&buffer);
+    /// assert_eq!(u8::deserialize(&mut de), Ok(0x01_u8));
+    /// assert_eq!(u16::deserialize(&mut de), Ok(0x0203_u16));
+    /// assert_eq!(u32::deserialize(&mut de), Ok(0x0405_0607_u32));
+    /// assert_eq!(u16::deserialize(&mut de), Err(Error::BufferOverflow));
+    /// ```
     ///
     /// # Errors
     ///
-    /// This function will return an error if the new limit would exceed the buffers
-    /// capacity.
-    pub fn set_limit(&mut self, limit: Option<usize>) -> Result<()> {
-        if let Some(len) = limit.map(|len| self.cursor + len) {
-            if len > self.buffer.len() {
-                return Err(Error::BufferOverflow);
-            }
-        }
-        self.limit = limit.map(|len| self.cursor + len);
-        Ok(())
-    }
-
-    /// Reads a value of type `T` from the buffer.
-    ///
-    /// This method reads a value of type `T` from the buffer, advancing the cursor
-    /// accordingly. It performs bounds checking if a limit has been set, ensuring
-    /// that the read operation does not exceed the specified limit.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if reading a value would exceed the buffer's
-    /// capacity or the set limit, or if converting the raw data into the value fails.
+    /// Returns an error if reading a value would exceed the buffer's capacity or the set limit, or
+    /// if converting the raw data into the value fails.
     pub fn read<T>(&mut self) -> Result<T>
     where
         T: for<'a> std::convert::TryFrom<&'a [u8]>,
     {
-        if let Some(limit) = self.limit {
+        if let Some(&limit) = self.limits.last() {
             if self.cursor + std::mem::size_of::<T>() > limit {
                 return Err(Error::ExceedsLimit);
             }
@@ -66,6 +86,85 @@ impl<'de> Deserializer<'de> {
                 self.cursor += std::mem::size_of::<T>();
                 v.try_into().map_err(|_| Error::Failure)
             })
+    }
+
+    /// Adds a limit to the amount of bytes which can be read, starting from the current position.
+    ///
+    /// This prevents the [`Deserializer::read`] operation from reading past this limit, even if
+    /// there is more data to be read.
+    ///
+    /// Use [`Deserializer::pop_limit`] to remove limits, instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip::bytes::{Deserialize, Deserializer, Error};
+    /// let buffer: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
+    /// let mut de = Deserializer::new(&buffer);
+    /// assert_eq!(de.push_limit(2), Ok(()));
+    /// assert_eq!(u16::deserialize(&mut de), Ok(0x0102));
+    /// assert_eq!(u16::deserialize(&mut de), Err(Error::ExceedsLimit));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the new limit exceeds the previous one, or the length of the buffer.
+    pub fn push_limit(&mut self, limit: usize) -> Result<()> {
+        if self
+            .limits
+            .last()
+            .is_some_and(|&current_limit| self.cursor + limit > current_limit)
+        {
+            return Err(Error::ExceedsLimit);
+        }
+        if self.cursor + limit > self.buffer.len() {
+            return Err(Error::BufferOverflow);
+        }
+        self.limits.push(self.cursor + limit);
+        Ok(())
+    }
+
+    /// Removes a limit to the amount of bytes which can be read.
+    ///
+    /// Will only remove the limit added by the last call to [`Deserializer::push_limit`]. To
+    /// remove more limits, further calls to [`Deserializer::pop_limit`] are needed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip::bytes::{Deserialize, Deserializer, Error};
+    /// let buffer: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
+    /// let mut de = Deserializer::new(&buffer);
+    /// assert_eq!(de.push_limit(2), Ok(()));
+    /// assert_eq!(Vec::<u8>::deserialize(&mut de), Ok(vec![0x01u8, 02]));
+    /// assert_eq!(de.pop_limit(), Ok(()));
+    /// assert_eq!(u16::deserialize(&mut de), Ok(0x0304));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there are no limits to remove.
+    pub fn pop_limit(&mut self) -> Result<()> {
+        self.limits.pop().map(|_| ()).ok_or(Error::Failure)
+    }
+
+    /// Returns the amount of bytes that can be read from the current position.
+    ///
+    /// If a limit is set, it will return the distance to that limit, else it will return the
+    /// distance to the end of the buffer.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip::bytes::Deserializer;
+    /// let buffer = [0u8; 8];
+    /// let mut de = Deserializer::new(&buffer);
+    /// assert_eq!(de.remaining(), 8);
+    /// assert_eq!(de.push_limit(6), Ok(()));
+    /// assert_eq!(de.remaining(), 6);
+    /// ```
+    pub fn remaining(&self) -> usize {
+        self.limits.last().copied().unwrap_or(self.buffer.len()) - self.cursor
     }
 }
 
@@ -91,6 +190,7 @@ pub trait Deserialize: Sized {
     /// regular `deserialize` method with the limited data.
     ///
     /// # Errors
+    ///
     /// This function will return an error if the deserialization process fails for any reason,
     /// such as encountering unexpected data, running out of data in the `Deserializer`, or
     /// exceeding the specified length.
@@ -102,9 +202,9 @@ pub trait Deserialize: Sized {
                 .try_into()
                 .map_err(|_| Error::Failure)?,
         };
-        de.set_limit(Some(length))?;
+        de.push_limit(length)?;
         let res = Self::deserialize(de);
-        de.set_limit(None)?;
+        de.pop_limit()?;
         res
     }
 }
@@ -114,12 +214,6 @@ macro_rules! deserialize_basic_type {
         impl Deserialize for $t {
             fn deserialize(de: &mut Deserializer) -> Result<Self> {
                 de.read().map(<$t>::from_be_bytes)
-            }
-
-            fn deserialize_len(_de: &mut Deserializer, _len: LengthField) -> Result<Self> {
-                Err(Error::Message(String::from(
-                    "basic types should not include a length field",
-                )))
             }
         }
     };
