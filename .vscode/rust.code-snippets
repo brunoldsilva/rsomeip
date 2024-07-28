@@ -1,0 +1,11 @@
+{
+    "Tokio Test Function": {
+        "scope": "rust",
+        "prefix": "ttfn",
+        "body": [
+            "#[tokio::test]",
+            "async fn ${1:feature}() {$0}",
+        ],
+        "description": "An asynchronous test function."
+    }
+}

@@ -37,6 +37,24 @@ impl Buffer {
         Some(buffer)
     }
 
+    /// Shrinks the buffer to the specified length.
+    ///
+    /// Using a length greater than the current length won't have any effect.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip::net::util::Buffer;
+    ///
+    /// let mut buffer = Buffer::from([1u8, 2, 3, 4, 5]);
+    /// assert_eq!(buffer.len(), 5);
+    /// buffer.shrink_to(2);
+    /// assert_eq!(buffer.len(), 2);
+    /// ```
+    pub fn shrink_to(&mut self, length: usize) {
+        self.range.end = self.range.start + self.range.end.min(length);
+    }
+
     /// Returns the length of the [`Buffer`] in bytes.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {

@@ -16,5 +16,6 @@
 
 pub mod bytes;
 pub mod net;
+pub mod socket;
 pub mod someip;
 pub(crate) mod testing;

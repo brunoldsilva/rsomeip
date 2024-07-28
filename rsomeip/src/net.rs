@@ -6,5 +6,4 @@ pub(crate) use std::net::SocketAddr;
 /// A specialized [Result] type for I/O operations.
 pub(crate) type IoResult<T> = std::io::Result<T>;
 
-pub mod socket;
 pub mod util;
