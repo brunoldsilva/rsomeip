@@ -124,12 +124,6 @@ macro_rules! serialize_basic_type {
             fn serialize(&self, ser: &mut Serializer) -> Result<()> {
                 ser.write(&self.to_be_bytes()).map(|_| ())
             }
-
-            fn serialize_len(&self, _ser: &mut Serializer, _len: LengthField) -> Result<()> {
-                Err(Error::Message(String::from(
-                    "basic types should not include a length field",
-                )))
-            }
         }
     };
 }
