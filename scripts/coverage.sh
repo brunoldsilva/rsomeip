@@ -91,6 +91,7 @@ function backup_folder() {
 # Generates a report from the raw coverage data.
 function generate_report() {
     echo 'coverage.rs: generating coverage report'
+    mkdir --parents ./target/debug/coverage/
     if ! grcov "${COVERAGE_TEST_DIR}" --source-dir ./rsomeip/src --binary-path ./target/debug/ \
          --output-types html,lcov --branch --ignore-not-existing \
          --output-path ./target/debug/coverage/
