@@ -7,13 +7,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+      - name: Build.
+        run: cargo build --verbose
+      - name: Test.
+        run: cargo test --verbose
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
       - name: Install cargo-tarpaulin.
         uses: taiki-e/install-action@v2.42.11
         with:
           tool: cargo-tarpaulin
-      - name: Build and run tests.
-        run: cargo tarpaulin --out Xml
-      - name: Upload coverage reports to Codecov.
+      - name: Run cargo-tarpaulin.
+        run: cargo tarpaulin --out Xml --line --count --verbose
+      - name: Upload coverage report.
         uses: codecov/codecov-action@v4.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
