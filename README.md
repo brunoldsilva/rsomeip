@@ -1,6 +1,11 @@
 # rsomeip
 
-A Rust implementation of AUTOSTAR's [Scalable service-Oriented MiddlewarE over IP (SOME/IP)](https://some-ip.com/).
+[![codecov-badge]][codecov-url]
+
+[codecov-badge]: https://codecov.io/github/brunoldsilva/rsomeip/graph/badge.svg?token=JTAL2QCM98
+[codecov-url]: https://codecov.io/github/brunoldsilva/rsomeip
+
+A Rust implementation of AUTOSAR's [Scalable service-Oriented MiddlewarE over IP (SOME/IP)](https://some-ip.com/).
 
 ## Overview
 
