@@ -3,14 +3,18 @@ name: Code Coverage
 on: [push]
 
 jobs:
-  lint:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - name: Generate code coverage data.
-        run: "${PWD}/scripts/coverage.sh"
+      - name: Install cargo-tarpaulin.
+        uses: taiki-e/install-action@v2.42.11
+        with:
+          tool: cargo-tarpaulin
+      - name: Build and run tests.
+        run: cargo tarpaulin --out Xml
       - name: Upload coverage reports to Codecov.
         uses: codecov/codecov-action@v4.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          directory: "./target/debug/coverage"
+          files: ./cobertura.xml
