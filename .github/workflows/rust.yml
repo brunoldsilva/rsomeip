@@ -1,20 +1,41 @@
 name: Rust
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+on: [push]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v3
+      - name: Run cargo clippy.
+        run: cargo clippy --verbose -- --deny warnings
+      - name: Run cargo fmt.
+        run: cargo fmt --check --verbose
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build.
+        run: cargo build --verbose
+      - name: Test.
+        run: cargo test --verbose
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install cargo-tarpaulin.
+        uses: taiki-e/install-action@v2.42.11
+        with:
+          tool: cargo-tarpaulin
+      - name: Run cargo-tarpaulin.
+        run: cargo tarpaulin --out Xml --line --count --verbose
+      - name: Upload coverage report.
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./cobertura.xml
