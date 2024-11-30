@@ -1,5 +1,5 @@
 use super::{Error, LengthField, Result};
-use std::{ops::Range, usize};
+use std::ops::Range;
 
 mod tests;
 

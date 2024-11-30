@@ -40,6 +40,7 @@ use tokio::net;
 ///
 /// let peer_address: SocketAddr = "127.0.0.2:30501".parse().unwrap();
 /// # let peer = tokio::net::TcpSocket::new_v4().unwrap();
+/// # peer.set_reuseaddr(true).unwrap();
 /// # peer.bind(peer_address).unwrap();
 /// # let listener = peer.listen(1).unwrap();
 /// # tokio::spawn(async move { listener.accept().await.unwrap(); });
@@ -60,11 +61,12 @@ use tokio::net;
 /// let mut listener = socket.listen(1).await.unwrap();
 /// # let peer_address: SocketAddr = "127.0.0.2:30502".parse().unwrap();
 /// # let peer = tokio::net::TcpSocket::new_v4().unwrap();
+/// # peer.set_reuseaddr(true).unwrap();
 /// # peer.bind(peer_address).unwrap();
 /// # tokio::spawn(async move {
-/// #   let peer = peer.connect(local_address).await.unwrap();
-/// #   peer.writable().await.unwrap();
-/// #   peer.try_write(&[1u8]).unwrap();
+/// #   let stream = peer.connect(local_address).await.unwrap();
+/// #   stream.writable().await.unwrap();
+/// #   stream.try_write(&[1u8]).unwrap();
 /// # });
 /// let ((sender, mut receiver), address) = listener.accept().await.unwrap();
 /// # assert_eq!(address, peer_address);

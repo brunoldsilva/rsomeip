@@ -20,7 +20,7 @@
 )]
 
 pub mod bytes;
-pub mod net;
 pub mod socket;
 pub mod someip;
+pub(crate) mod support;
 pub(crate) mod testing;

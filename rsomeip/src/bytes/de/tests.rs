@@ -36,6 +36,7 @@ fn limit() {
 macro_rules! test_deserialize_basic_type {
     ($t:ty, $name:tt) => {
         #[test]
+        #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
         fn $name() {
             let buf = (1 as $t).to_be_bytes();
             let mut de = Deserializer::new(&buf);

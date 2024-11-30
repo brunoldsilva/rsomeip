@@ -18,8 +18,8 @@
 //! [`socket`]: crate::socket
 
 use crate::{
-    net::util::SharedMap,
     socket::{Connector, IoResult, Listener, Receiver, RecvError, SendError, Sender, SocketAddr},
+    support::collections::SharedMap,
 };
 use bytes::Bytes;
 use std::{
@@ -49,10 +49,10 @@ type ConnectionSender = mpsc::Sender<((UdpSender, UdpReceiver), SocketAddr)>;
 /// # tokio_test::block_on(async move {
 /// use rsomeip::socket::{SocketAddr, Connector, Sender, udp::UdpSocket};
 /// use bytes::Bytes;
-/// let local_address: SocketAddr = "127.0.0.1:30501".parse().unwrap();
+/// let local_address: SocketAddr = "127.0.0.1:30503".parse().unwrap();
 /// let mut socket = UdpSocket::bind(local_address).await.unwrap();
 ///
-/// let peer_address: SocketAddr = "127.0.0.2:30501".parse().unwrap();
+/// let peer_address: SocketAddr = "127.0.0.2:30503".parse().unwrap();
 /// let (mut sender, receiver) = socket.connect(&peer_address).await.unwrap();
 /// sender.send(Bytes::copy_from_slice(&[1u8])).await.unwrap();
 /// # });
@@ -64,11 +64,11 @@ type ConnectionSender = mpsc::Sender<((UdpSender, UdpReceiver), SocketAddr)>;
 /// # tokio_test::block_on(async move {
 /// use rsomeip::socket::{SocketAddr, Connector, Receiver, Listener, udp::UdpSocket};
 /// use bytes::Bytes;
-/// let local_address: SocketAddr = "127.0.0.1:30502".parse().unwrap();
+/// let local_address: SocketAddr = "127.0.0.1:30504".parse().unwrap();
 /// let mut socket = UdpSocket::bind(local_address).await.unwrap();
 ///
 /// let mut listener = socket.listen(1).await.unwrap();
-/// # let peer_address: SocketAddr = "127.0.0.2:30502".parse().unwrap();
+/// # let peer_address: SocketAddr = "127.0.0.2:30504".parse().unwrap();
 /// # let peer = tokio::net::UdpSocket::bind(&peer_address).await.unwrap();
 /// # peer.send_to(&[1u8], local_address).await.unwrap();
 /// let ((sender, mut receiver), address) = listener.accept().await.unwrap();
