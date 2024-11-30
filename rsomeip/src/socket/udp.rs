@@ -340,13 +340,13 @@ mod tests {
     #[tokio::test]
     async fn connection_sends_data_to_unicast() {
         // Create an UdpSocket.
-        let local_address = ipv4!([127, 0, 0, 1]);
+        let local_address = ipv4!();
         let mut socket = UdpSocket::bind(local_address)
             .await
             .expect("should bind to address");
 
         // Create a Udp receiver.
-        let peer_address = ipv4!([127, 0, 0, 2]);
+        let peer_address = ipv4!();
         let peer = net::UdpSocket::bind(peer_address)
             .await
             .expect("should bind to address");
