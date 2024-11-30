@@ -7,12 +7,17 @@
 //! SOME/IP, a message-based Inter-process Communication (IPC) protocol developed for the
 //! automotive industry.
 
-#![warn(clippy::nursery)]
-#![warn(clippy::pedantic)]
-#![warn(clippy::expect_used)]
-#![warn(clippy::unwrap_used)]
-#![allow(clippy::missing_const_for_fn)]
-#![allow(clippy::must_use_candidate)]
+#![warn(
+    clippy::nursery,
+    clippy::pedantic,
+    clippy::expect_used,
+    clippy::unwrap_used
+)]
+#![allow(
+    clippy::missing_const_for_fn,
+    clippy::must_use_candidate,
+    clippy::module_name_repetitions
+)]
 
 pub mod bytes;
 pub mod net;
