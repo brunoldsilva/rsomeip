@@ -1,313 +1,343 @@
-use super::{Error, LengthField, Result};
+//! Deserialization according to the SOME/IP protocol.
+//!
+//! Provides the [`Deserialize`] trait for deserializing data, and several implementations of this
+//! trait for types of the standard library.
 
-mod tests;
+use super::{Buf, Bytes, LengthField};
 
-/// Extracts data from a byte buffer in sequential order.
+/// Deserialize data from a SOME/IP byte stream.
 ///
-/// Using [`Deserializer::read`], any type that implements [`TryFrom`] for `&[u8]` can be safely
-/// extracted, provided that there is enough data in the buffer.
+/// This trait provides methods for deserializing data structures from a byte stream ([`Bytes`])
+/// encoded in the SOME/IP on-wire format.
 ///
-/// Arbitrary limits can be set with [`Deserializer::push_limit`], and removed with
-/// [`Deserializer::pop_limit`], to further control the amount of bytes that can be read at any
-/// given time.
-pub struct Deserializer<'de> {
-    buffer: &'de [u8],
-    cursor: usize,
-    limits: Vec<usize>,
-}
+/// [`deserialize`] is used to deserialize statically sized types, while [`deserialize_len`] is
+/// used to deserialize dynamically sized types from the stream.
+///
+/// [`deserialize`]: Deserialize::deserialize
+/// [`deserialize_len`]: Deserialize::deserialize_len
+pub trait Deserialize {
+    /// Type of the data that will be deserialized.
+    type Output: Sized;
 
-impl<'de> Deserializer<'de> {
-    /// Create a new [`Deserializer`].
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use rsomeip::bytes::{Deserialize, Deserializer, Error};
-    /// let buffer: [u8; 2] = [0x01, 0x02];
-    /// let mut de = Deserializer::new(&buffer);
-    /// assert_eq!(u16::deserialize(&mut de), Ok(0x0102));
-    /// ```
-    #[must_use]
-    pub fn new(buffer: &'de [u8]) -> Self {
-        Self {
-            buffer,
-            cursor: 0,
-            limits: Vec::default(),
-        }
-    }
-
-    /// Reads a value of type `T` from the buffer, and advances the read position accordingly.
-    ///
-    /// Does bounds checking to prevent reading past any set limit, or the end of the buffer.
-    ///
-    /// # Examples
-    ///
-    /// Basic usage:
-    ///
-    /// ```rust
-    /// use rsomeip::bytes::{Deserializer, Error};
-    /// let buffer: [u8; 7] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-    /// let mut de = Deserializer::new(&buffer);
-    /// assert_eq!(de.read().map(u8::from_be_bytes), Ok(0x01_u8));
-    /// assert_eq!(de.read().map(u16::from_be_bytes), Ok(0x0203_u16));
-    /// assert_eq!(de.read().map(u32::from_be_bytes), Ok(0x0405_0607_u32));
-    /// assert_eq!(de.read().map(u16::from_be_bytes), Err(Error::BufferOverflow));
-    /// ```
-    ///
-    /// However, in most cases, you'll want to use the [`Deserialize`] trait instead:
-    ///
-    /// ```rust
-    /// use rsomeip::bytes::{Deserialize, Deserializer, Error};
-    /// let buffer: [u8; 7] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-    /// let mut de = Deserializer::new(&buffer);
-    /// assert_eq!(u8::deserialize(&mut de), Ok(0x01_u8));
-    /// assert_eq!(u16::deserialize(&mut de), Ok(0x0203_u16));
-    /// assert_eq!(u32::deserialize(&mut de), Ok(0x0405_0607_u32));
-    /// assert_eq!(u16::deserialize(&mut de), Err(Error::BufferOverflow));
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if reading a value would exceed the buffer's capacity or the set limit, or
-    /// if converting the raw data into the value fails.
-    pub fn read<T>(&mut self) -> Result<T>
-    where
-        T: for<'a> std::convert::TryFrom<&'a [u8]>,
-    {
-        if let Some(&limit) = self.limits.last() {
-            if self.cursor + std::mem::size_of::<T>() > limit {
-                return Err(Error::ExceedsLimit);
-            }
-        }
-        self.buffer
-            .get(self.cursor..self.cursor + std::mem::size_of::<T>())
-            .ok_or(Error::BufferOverflow)
-            .and_then(|v| {
-                self.cursor += std::mem::size_of::<T>();
-                v.try_into().map_err(|_| Error::Failure)
-            })
-    }
-
-    /// Adds a limit to the amount of bytes which can be read, starting from the current position.
-    ///
-    /// This prevents the [`Deserializer::read`] operation from reading past this limit, even if
-    /// there is more data to be read.
-    ///
-    /// Use [`Deserializer::pop_limit`] to remove limits, instead.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use rsomeip::bytes::{Deserialize, Deserializer, Error};
-    /// let buffer: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
-    /// let mut de = Deserializer::new(&buffer);
-    /// assert_eq!(de.push_limit(2), Ok(()));
-    /// assert_eq!(u16::deserialize(&mut de), Ok(0x0102));
-    /// assert_eq!(u16::deserialize(&mut de), Err(Error::ExceedsLimit));
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the new limit exceeds the previous one, or the length of the buffer.
-    pub fn push_limit(&mut self, limit: usize) -> Result<()> {
-        if self
-            .limits
-            .last()
-            .is_some_and(|&current_limit| self.cursor + limit > current_limit)
-        {
-            return Err(Error::ExceedsLimit);
-        }
-        if self.cursor + limit > self.buffer.len() {
-            return Err(Error::BufferOverflow);
-        }
-        self.limits.push(self.cursor + limit);
-        Ok(())
-    }
-
-    /// Removes a limit to the amount of bytes which can be read.
-    ///
-    /// Will only remove the limit added by the last call to [`Deserializer::push_limit`]. To
-    /// remove more limits, further calls to [`Deserializer::pop_limit`] are needed.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use rsomeip::bytes::{Deserialize, Deserializer, Error};
-    /// let buffer: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
-    /// let mut de = Deserializer::new(&buffer);
-    /// assert_eq!(de.push_limit(2), Ok(()));
-    /// assert_eq!(Vec::<u8>::deserialize(&mut de), Ok(vec![0x01u8, 02]));
-    /// assert_eq!(de.pop_limit(), Ok(()));
-    /// assert_eq!(u16::deserialize(&mut de), Ok(0x0304));
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if there are no limits to remove.
-    pub fn pop_limit(&mut self) -> Result<()> {
-        self.limits.pop().map(|_| ()).ok_or(Error::Failure)
-    }
-
-    /// Returns the amount of bytes that can be read from the current position.
-    ///
-    /// If a limit is set, it will return the distance to that limit, else it will return the
-    /// distance to the end of the buffer.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use rsomeip::bytes::Deserializer;
-    /// let buffer = [0u8; 8];
-    /// let mut de = Deserializer::new(&buffer);
-    /// assert_eq!(de.remaining(), 8);
-    /// assert_eq!(de.push_limit(6), Ok(()));
-    /// assert_eq!(de.remaining(), 6);
-    /// ```
-    pub fn remaining(&self) -> usize {
-        self.limits.last().copied().unwrap_or(self.buffer.len()) - self.cursor
-    }
-}
-
-pub trait Deserialize: Sized {
-    /// Deserializes an instance of the implementing type from a `Deserializer`.
-    ///
-    /// This function is used to deserialize an instance of the implementing type from the provided
-    /// `Deserializer`. The implementation of this function should specify how the data should be
-    /// deserialized and return the deserialized instance on success.
+    /// Deserializes an instance of [`Deserialize::Output`] from the buffer.
     ///
     /// # Errors
     ///
     /// This function will return an error if the deserialization process fails for any reason,
-    /// such as encountering unexpected data or running out of data in the `Deserializer`.
-    fn deserialize(de: &mut Deserializer) -> Result<Self>;
-
-    /// Deserialize an instance of the implementing type with a specified length field.
+    /// such as encountering unexpected data or running out of data in the buffer.
     ///
-    /// This function provides an extended version of `deserialize`, allowing you to deserialize
-    /// an instance of the implementing type with a specified length field (`LengthField`)
-    /// indicating the size of the data to be deserialized. It first reads the length field and
-    /// uses it to limit the amount of data read from the `Deserializer`. Then, it calls the
-    /// regular `deserialize` method with the limited data.
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip::bytes::{Bytes, Deserialize, DeserializeError};
+    /// let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8]);
+    /// assert_eq!(u8::deserialize(&mut buffer), Ok(1u8));
+    /// assert_eq!(u8::deserialize(&mut buffer), Ok(2u8));
+    /// assert_eq!(u8::deserialize(&mut buffer), Err(DeserializeError));
+    /// ```
+    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError>;
+
+    /// Deserializes an instance of [`Deserialize::Output`] from the buffer.
+    ///
+    /// This method specifies a length field which is used to indicate the size of the data to be
+    /// deserialized. This is necessary in case of dynamically sized data structures, like [`Vec`]
+    /// or [`String`].
     ///
     /// # Errors
     ///
     /// This function will return an error if the deserialization process fails for any reason,
-    /// such as encountering unexpected data, running out of data in the `Deserializer`, or
-    /// exceeding the specified length.
-    fn deserialize_len(de: &mut Deserializer, len: LengthField) -> Result<Self> {
-        let length: usize = match len {
-            LengthField::U8 => u8::deserialize(de)?.into(),
-            LengthField::U16 => u16::deserialize(de)?.into(),
-            LengthField::U32 => u32::deserialize(de)?
+    /// such as encountering unexpected data, running out of data in the buffer, or exceeding the
+    /// specified length.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip::bytes::{Bytes, Deserialize, DeserializeError, LengthField};
+    ///
+    /// let mut buffer = Bytes::copy_from_slice(&[2u8, 1u8, 2u8, 3u8]);
+    /// let vec: Vec<u8> = Vec::deserialize_len(LengthField::U8, &mut buffer).unwrap();
+    /// assert_eq!(&vec[..], &[1u8, 2u8][..]);
+    ///
+    /// assert_eq!(u8::deserialize(&mut buffer), Ok(3u8));
+    /// assert_eq!(u8::deserialize(&mut buffer), Err(DeserializeError));
+    /// ```
+    fn deserialize_len(
+        length: LengthField,
+        buffer: &mut Bytes,
+    ) -> Result<Self::Output, DeserializeError> {
+        let length: usize = match length {
+            LengthField::U8 => u8::deserialize(buffer)?.into(),
+            LengthField::U16 => u16::deserialize(buffer)?.into(),
+            LengthField::U32 => u32::deserialize(buffer)?
                 .try_into()
-                .map_err(|_| Error::Failure)?,
+                .map_err(|_| DeserializeError)?,
         };
-        de.push_limit(length)?;
-        let res = Self::deserialize(de);
-        de.pop_limit()?;
-        res
+        let mut payload = buffer.split_to(length);
+        Self::deserialize(&mut payload)
     }
 }
 
 macro_rules! deserialize_basic_type {
-    ($t:ty) => {
+    ($t:ty, $f:ident) => {
         impl Deserialize for $t {
-            fn deserialize(de: &mut Deserializer) -> Result<Self> {
-                de.read().map(<$t>::from_be_bytes)
+            type Output = Self;
+
+            fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+                if buffer.remaining() < size_of::<Self>() {
+                    return Err(DeserializeError);
+                }
+                Ok(buffer.$f())
             }
         }
     };
 }
 
-deserialize_basic_type!(u8);
-deserialize_basic_type!(u16);
-deserialize_basic_type!(u32);
-deserialize_basic_type!(u64);
-deserialize_basic_type!(i8);
-deserialize_basic_type!(i16);
-deserialize_basic_type!(i32);
-deserialize_basic_type!(i64);
-deserialize_basic_type!(f32);
-deserialize_basic_type!(f64);
+deserialize_basic_type!(u8, get_u8);
+deserialize_basic_type!(u16, get_u16);
+deserialize_basic_type!(u32, get_u32);
+deserialize_basic_type!(u64, get_u64);
+deserialize_basic_type!(i8, get_i8);
+deserialize_basic_type!(i16, get_i16);
+deserialize_basic_type!(i32, get_i32);
+deserialize_basic_type!(i64, get_i64);
+deserialize_basic_type!(f32, get_f32);
+deserialize_basic_type!(f64, get_f64);
 
 impl Deserialize for bool {
-    fn deserialize(de: &mut Deserializer) -> Result<Self> {
-        u8::deserialize(de).map(|v| (v & 0x01) == 1u8)
-    }
+    type Output = Self;
 
-    fn deserialize_len(_de: &mut Deserializer, _len: LengthField) -> Result<Self> {
-        Err(Error::Message(String::from(
-            "basic types should not include a length field",
-        )))
+    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+        if buffer.remaining() < size_of::<Self>() {
+            return Err(DeserializeError);
+        }
+        Ok((buffer.get_u8() & 0x01) == 0x01)
     }
 }
 
 impl<T, const N: usize> Deserialize for [T; N]
 where
-    T: Deserialize + Default,
+    T: Deserialize<Output = T> + Default,
 {
-    fn deserialize(de: &mut Deserializer) -> Result<Self> {
+    type Output = Self;
+
+    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
         Ok(std::array::from_fn(|_| {
-            T::deserialize(de).unwrap_or_default()
+            T::deserialize(buffer).unwrap_or_default()
         }))
     }
 }
 
 impl<T> Deserialize for Vec<T>
 where
-    T: Deserialize,
+    T: Deserialize<Output = T>,
 {
-    fn deserialize(de: &mut Deserializer) -> Result<Self> {
-        let mut vec = Self::new();
-        loop {
-            match T::deserialize(de) {
-                Ok(element) => vec.push(element),
-                Err(Error::ExceedsLimit) => break,
-                Err(err) => return Err(err),
-            }
+    type Output = Self;
+
+    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+        let mut vec = vec![];
+        while buffer.has_remaining() {
+            vec.push(T::deserialize(buffer)?);
         }
         Ok(vec)
     }
 }
 
+macro_rules! deserialize_tuple {
+    ( $( $name:ident )+ ) => {
+        impl<$($name: Deserialize<Output=$name>),+> Deserialize for ($($name,)+) {
+            type Output = Self;
+            fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+                Ok((
+                    $($name::deserialize(buffer)?,)+
+                ))
+            }
+        }
+    };
+}
+
+deserialize_tuple! { A }
+deserialize_tuple! { A B }
+deserialize_tuple! { A B C }
+deserialize_tuple! { A B C D }
+deserialize_tuple! { A B C D E }
+deserialize_tuple! { A B C D E F }
+deserialize_tuple! { A B C D E F G }
+deserialize_tuple! { A B C D E F G H }
+deserialize_tuple! { A B C D E F G H I }
+deserialize_tuple! { A B C D E F G H I J }
+deserialize_tuple! { A B C D E F G H I J K }
+deserialize_tuple! { A B C D E F G H I J K L }
+
 impl Deserialize for String {
-    fn deserialize(de: &mut Deserializer) -> Result<Self> {
+    type Output = Self;
+
+    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
         /// Deserializes an UTF-8 encoded, null terminated string.
-        fn deserialize_utf8(de: &mut Deserializer) -> Result<String> {
-            if u8::deserialize(de)? != 0xbf_u8 {
-                return Err(Error::Failure);
+        fn deserialize_utf8(buffer: &mut Bytes) -> Result<String, DeserializeError> {
+            if u8::deserialize(buffer)? != 0xbf_u8 {
+                return Err(DeserializeError);
             }
             let mut raw_string = Vec::<u8>::new();
             loop {
-                let value = u8::deserialize(de)?;
+                let value = u8::deserialize(buffer)?;
                 if value == 0x00 {
                     break;
                 }
                 raw_string.push(value);
             }
-            String::from_utf8(raw_string).map_err(|_| Error::Failure)
+            String::from_utf8(raw_string).map_err(|_| DeserializeError)
         }
         /// Deserializes an UTF-16 encoded, null terminated string.
-        fn deserialize_utf16(de: &mut Deserializer, is_be: bool) -> Result<String> {
+        fn deserialize_utf16(buffer: &mut Bytes, is_be: bool) -> Result<String, DeserializeError> {
             let mut raw_string = Vec::<u16>::new();
             loop {
                 let value = if is_be {
-                    u16::deserialize(de)?
+                    u16::deserialize(buffer)?
                 } else {
-                    u16::deserialize(de).map(u16::from_be)?
+                    u16::deserialize(buffer).map(u16::from_be)?
                 };
                 if value == 0x0000 {
                     break;
                 }
                 raw_string.push(value);
             }
-            String::from_utf16(&raw_string).map_err(|_| Error::Failure)
+            String::from_utf16(&raw_string).map_err(|_| DeserializeError)
         }
-        match dbg!(u16::deserialize(de)?) {
-            0xefbb => deserialize_utf8(de),
-            0xfeff => deserialize_utf16(de, true),
-            0xfffe => deserialize_utf16(de, false),
-            _ => Err(Error::Failure),
+        match dbg!(u16::deserialize(buffer)?) {
+            0xefbb => deserialize_utf8(buffer),
+            0xfeff => deserialize_utf16(buffer, true),
+            0xfffe => deserialize_utf16(buffer, false),
+            _ => Err(DeserializeError),
         }
+    }
+}
+
+impl Deserialize for Bytes {
+    type Output = Self;
+
+    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+        Ok(buffer.split_to(buffer.remaining()))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DeserializeError;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::Bytes;
+
+    macro_rules! test_deserialize_basic_type {
+        ($t:ty, $name:tt) => {
+            #[test]
+            #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
+            fn $name() {
+                let mut buffer = Bytes::from((1 as $t).to_be_bytes().to_vec());
+                assert_eq!(<$t>::deserialize(&mut buffer), Ok(1 as $t));
+                assert_eq!(<$t>::deserialize(&mut buffer), Err(DeserializeError));
+            }
+        };
+    }
+
+    test_deserialize_basic_type!(u8, deserialize_u8);
+    test_deserialize_basic_type!(u16, deserialize_u16);
+    test_deserialize_basic_type!(u32, deserialize_u32);
+    test_deserialize_basic_type!(u64, deserialize_u64);
+    test_deserialize_basic_type!(i8, deserialize_i8);
+    test_deserialize_basic_type!(i16, deserialize_i16);
+    test_deserialize_basic_type!(i32, deserialize_i32);
+    test_deserialize_basic_type!(i64, deserialize_i64);
+    test_deserialize_basic_type!(f32, deserialize_f32);
+    test_deserialize_basic_type!(f64, deserialize_f64);
+
+    #[test]
+    fn deserialize_bool() {
+        let mut buffer = Bytes::copy_from_slice(&[0u8, 1u8]);
+        assert_eq!(bool::deserialize(&mut buffer), Ok(false));
+        assert_eq!(bool::deserialize(&mut buffer), Ok(true));
+        assert_eq!(bool::deserialize(&mut buffer), Err(DeserializeError));
+    }
+
+    #[test]
+    fn deserialize_len() {
+        let mut buffer = Bytes::copy_from_slice(&[2u8, 1u8, 2u8, 3u8]);
+        let vec: Vec<u8> =
+            Vec::deserialize_len(LengthField::U8, &mut buffer).expect("should deserialize the vec");
+        assert_eq!(&vec[..], &[1u8, 2u8][..]);
+    }
+
+    #[test]
+    fn deserialize_array() {
+        let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8]);
+        assert_eq!(<[u8; 2]>::deserialize(&mut buffer), Ok([1u8, 2u8]));
+        assert_eq!(<[u8; 2]>::deserialize(&mut buffer), Ok([0u8, 0u8]));
+    }
+
+    #[test]
+    fn deserialize_vec() {
+        let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8]);
+        let vec: Vec<u8> = Vec::deserialize(&mut buffer).expect("should deserialize the vec");
+        assert_eq!(&vec[..], &[1u8, 2u8][..]);
+    }
+
+    #[test]
+    fn deserialize_malformed_vec() {
+        let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8, 3u8]);
+        let error =
+            Vec::<u16>::deserialize(&mut buffer).expect_err("should not deserialize the vec");
+        assert_eq!(error, DeserializeError);
+    }
+
+    #[test]
+    fn deserialize_tuple() {
+        let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8]);
+        assert_eq!(<(u8, u8)>::deserialize(&mut buffer), Ok((1u8, 2u8)));
+        assert_eq!(<(u8, u8)>::deserialize(&mut buffer), Err(DeserializeError));
+    }
+
+    #[test]
+    fn deserialize_bytes() {
+        let mut buffer = Bytes::copy_from_slice(&[2u8, 1u8, 2u8, 3u8, 4u8]);
+
+        let bytes = Bytes::deserialize_len(LengthField::U8, &mut buffer)
+            .expect("should deserialize the bytes");
+        assert_eq!(&bytes[..], &[1u8, 2u8][..]);
+
+        let bytes = Bytes::deserialize(&mut buffer).expect("should deserialize the bytes");
+        assert_eq!(&bytes[..], &[3u8, 4u8][..]);
+    }
+
+    #[test]
+    fn deserialize_utf8() {
+        let raw_string = [
+            0xef_u8, // Byte Order Mark
+            0xbb, 0xbf, 0x72, 0x75, 0x73, 0x74, // "rust"
+            0x00, // Delimiter
+        ];
+        let mut buffer = Bytes::copy_from_slice(&raw_string);
+        assert_eq!(String::deserialize(&mut buffer), Ok(String::from("rust")));
+    }
+
+    #[test]
+    fn deserialize_utf16_be() {
+        let raw_string = [
+            0xfe_u8, 0xff, // Big-Endian Byte Order Mark
+            0x95, 0x08, // "锈"
+            0x00, 0x00, // Delimiter
+        ];
+        let mut buffer = Bytes::copy_from_slice(&raw_string);
+        assert_eq!(String::deserialize(&mut buffer), Ok(String::from("锈")));
+    }
+
+    #[test]
+    fn deserialize_utf16_le() {
+        let raw_string = [
+            0xff_u8, 0xfe, // Little-Endian Byte Order Mark
+            0x08, 0x95, // "锈"
+            0x00, 0x00, // Delimiter
+        ];
+        let mut buffer = Bytes::copy_from_slice(&raw_string);
+        assert_eq!(String::deserialize(&mut buffer), Ok(String::from("锈")));
     }
 }

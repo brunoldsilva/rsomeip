@@ -9,6 +9,8 @@
 //!
 //! - [`ReturnCode`] helps servers notify clients of the result of a request.
 
+use crate::bytes::{Bytes, BytesMut, Deserialize, LengthField, Serialize};
+
 /// Identifier of the method of a service.
 pub type MessageId = u32;
 
@@ -231,6 +233,63 @@ impl<T> Message<T> {
     }
 }
 
+impl<T> Serialize for Message<T>
+where
+    T: Serialize,
+{
+    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, crate::bytes::SerializeError> {
+        let mut size = 0;
+        size += self.id().serialize(buffer)?;
+
+        // A length field is expected between the message id and the rest of the payload, so we
+        // introduce it here by encapsulating the request and serializing it with `serialize_len`.
+        let request = |buffer: &mut BytesMut| {
+            let mut size = 0;
+            size += self.request().serialize(buffer)?;
+            size += self.protocol.serialize(buffer)?;
+            size += self.interface.serialize(buffer)?;
+            size += self.message_type.serialize(buffer)?;
+            size += self.return_code.serialize(buffer)?;
+            size += self.payload.serialize(buffer)?;
+            Ok(size)
+        };
+        size += request.serialize_len(LengthField::U32, buffer)?;
+
+        Ok(size)
+    }
+}
+
+impl<T> Deserialize for Message<T>
+where
+    T: Deserialize<Output = T>,
+{
+    type Output = Self;
+
+    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, crate::bytes::DeserializeError> {
+        type Request<T> = (
+            RequestId,
+            ProtocolVersion,
+            InterfaceVersion,
+            MessageType,
+            ReturnCode,
+            T,
+        );
+        let id = MessageId::deserialize(buffer)?;
+
+        // A length field is expected here which we must account for when deserializing the request.
+        let (request, protocol, interface, message_type, return_code, payload) =
+            Request::<T>::deserialize_len(LengthField::U32, buffer)?;
+
+        Ok(Self::new(payload)
+            .with_id(id)
+            .with_request(request)
+            .with_protocol(protocol)
+            .with_interface(interface)
+            .with_type(message_type)
+            .with_code(return_code))
+    }
+}
+
 impl<T: Default> Default for Message<T> {
     fn default() -> Self {
         Self::new(T::default())
@@ -306,6 +365,20 @@ impl From<MessageType> for u8 {
             MessageType::TpError => 0xa1,
             MessageType::Unknown(x) => x,
         }
+    }
+}
+
+impl Serialize for MessageType {
+    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, crate::bytes::SerializeError> {
+        u8::from(*self).serialize(buffer)
+    }
+}
+
+impl Deserialize for MessageType {
+    type Output = Self;
+
+    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, crate::bytes::DeserializeError> {
+        Ok(Self::from(u8::deserialize(buffer)?))
     }
 }
 
@@ -386,6 +459,20 @@ impl From<ReturnCode> for u8 {
     }
 }
 
+impl Serialize for ReturnCode {
+    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, crate::bytes::SerializeError> {
+        u8::from(*self).serialize(buffer)
+    }
+}
+
+impl Deserialize for ReturnCode {
+    type Output = Self;
+
+    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, crate::bytes::DeserializeError> {
+        Ok(Self::from(u8::deserialize(buffer)?))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,6 +509,46 @@ mod tests {
         assert_eq!(message.to_string(), "1234.5678.9abc.def0.80.01");
     }
 
+    // A message serialized with the SOME/IP format.
+    const SERIALIZED_MESSAGE: [u8; 17] = [
+        0x12, 0x34, 0x56, 0x78, // message id
+        0x00, 0x00, 0x00, 0x09, // length
+        0x9a, 0xbc, 0xde, 0xf0, // request id
+        0x01, // protocol version
+        0x00, // interface version
+        0x80, // message type
+        0x01, // return code
+        0x01, // payload
+    ];
+
+    #[test]
+    fn serialize_message() {
+        let mut buffer = BytesMut::with_capacity(17);
+        let message = Message::new(1u8)
+            .with_id(0x1234_5678)
+            .with_request(0x9abc_def0)
+            .with_type(MessageType::Response)
+            .with_code(ReturnCode::NotOk);
+        assert_eq!(message.serialize(&mut buffer), Ok(17));
+        assert_eq!(&buffer.freeze()[..], &SERIALIZED_MESSAGE);
+    }
+
+    #[test]
+    fn deserialize_message() {
+        let mut buffer = Bytes::copy_from_slice(&SERIALIZED_MESSAGE);
+        let message =
+            Message::<u8>::deserialize(&mut buffer).expect("should deserialize the message");
+        assert_eq!(message.service, 0x1234);
+        assert_eq!(message.method, 0x5678);
+        assert_eq!(message.client, 0x9abc);
+        assert_eq!(message.session, 0xdef0);
+        assert_eq!(message.protocol, 0x01);
+        assert_eq!(message.interface, 0x00);
+        assert_eq!(message.message_type, MessageType::Response);
+        assert_eq!(message.return_code, ReturnCode::NotOk);
+        assert_eq!(message.payload, 1u8);
+    }
+
     #[test]
     fn message_type_from_u8() {
         assert_eq!(MessageType::from(0x00), MessageType::Request);
@@ -454,6 +581,22 @@ mod tests {
         (u8::MIN..=u8::MAX)
             .filter(|x| ![0x00, 0x01, 0x02, 0x80, 0x81, 0x20, 0x21, 0x22, 0xa0, 0xa1].contains(x))
             .for_each(|x| assert_eq!(u8::from(MessageType::Unknown(x)), x));
+    }
+
+    #[test]
+    fn serialize_message_type() {
+        let mut buffer = BytesMut::with_capacity(1);
+        assert_eq!(MessageType::Response.serialize(&mut buffer), Ok(1));
+        assert_eq!(&buffer.freeze()[..], &[0x80]);
+    }
+
+    #[test]
+    fn deserialize_message_type() {
+        let mut buffer = Bytes::copy_from_slice(&[0x80_u8]);
+        assert_eq!(
+            MessageType::deserialize(&mut buffer),
+            Ok(MessageType::Response)
+        );
     }
 
     #[test]
@@ -498,5 +641,18 @@ mod tests {
         assert_eq!(0x0f, u8::from(ReturnCode::E2eNoNewData));
         (0x10..=0x5e).for_each(|x| assert_eq!(u8::from(ReturnCode::Reserved(x)), x));
         (0x5f..=u8::MAX).for_each(|x| assert_eq!(u8::from(ReturnCode::Unknown(x)), x));
+    }
+
+    #[test]
+    fn serialize_return_code() {
+        let mut buffer = BytesMut::with_capacity(1);
+        assert_eq!(ReturnCode::NotOk.serialize(&mut buffer), Ok(1));
+        assert_eq!(&buffer.freeze()[..], &[0x01]);
+    }
+
+    #[test]
+    fn deserialize_return_code() {
+        let mut buffer = Bytes::copy_from_slice(&[1u8]);
+        assert_eq!(ReturnCode::deserialize(&mut buffer), Ok(ReturnCode::NotOk));
     }
 }
