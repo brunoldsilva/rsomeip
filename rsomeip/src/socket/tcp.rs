@@ -23,6 +23,8 @@ use crate::socket::{
 use bytes::Bytes;
 use tokio::net;
 
+use super::ProtocolType;
+
 /// A socket of the TCP protocol.
 ///
 /// Implements the [`Connector`] trait for establishing connections to other TCP sockets.
@@ -91,6 +93,8 @@ impl Connector for TcpSocket {
     type Sender = TcpSender;
     type Receiver = TcpReceiver;
     type Listener = TcpListener;
+
+    const PROTOCOL_TYPE: ProtocolType = ProtocolType::Stream;
 
     async fn connect(&mut self, address: &SocketAddr) -> IoResult<(Self::Sender, Self::Receiver)> {
         let socket = match self.address {
@@ -172,7 +176,10 @@ impl Receiver for TcpReceiver {
                     |_| Err(RecvError::Closed),
                     |size| Ok(Bytes::copy_from_slice(&self.buffer[..size])),
                 ),
-                Err(ref error) if error.kind() == std::io::ErrorKind::WouldBlock => continue,
+                Err(ref error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    // False positive. Socket is not readable.
+                    continue;
+                }
                 Err(_) => Err(RecvError::Closed),
             };
             return result;

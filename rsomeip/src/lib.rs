@@ -15,12 +15,17 @@
 )]
 #![allow(
     clippy::missing_const_for_fn,
+    clippy::module_name_repetitions,
     clippy::must_use_candidate,
-    clippy::module_name_repetitions
+    clippy::future_not_send
 )]
 
 pub mod bytes;
+pub mod endpoint;
 pub mod socket;
 pub mod someip;
 pub(crate) mod support;
 pub(crate) mod testing;
+
+mod error;
+pub use error::{Error, Result};

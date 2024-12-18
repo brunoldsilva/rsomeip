@@ -35,6 +35,9 @@ pub type ProtocolVersion = u8;
 /// Major version of the service referenced by the [`ServiceId`].
 pub type InterfaceVersion = u8;
 
+/// Size in bytes of a SOME/IP header.
+pub const HEADER_SIZE: usize = 16;
+
 /// A SOME/IP message.
 ///
 /// This struct encapsulates the essential components of a SOME/IP message, allowing for the
@@ -297,10 +300,24 @@ impl<T: Default> Default for Message<T> {
 }
 
 impl<T> std::fmt::Display for Message<T> {
+    /// Formats the [`Message<T>`] into a string.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip::someip::{Message, MessageType, ReturnCode};
+    ///
+    /// let message = Message::new(1u8)
+    ///     .with_id(0x1234_5678)
+    ///     .with_request(0x9abc_def0)
+    ///     .with_type(MessageType::Response)
+    ///     .with_code(ReturnCode::NotOk);
+    /// assert_eq!(message.to_string(), "M.1234.5678.9abc.def0.80.01");
+    /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{:04x?}.{:04x?}.{:04x?}.{:04x?}.{:02x?}.{:02x?}",
+            "M.{:04x?}.{:04x?}.{:04x?}.{:04x?}.{:02x?}.{:02x?}",
             self.service,
             self.method,
             self.client,
@@ -497,16 +514,6 @@ mod tests {
         assert_eq!(message.message_type, MessageType::Notification);
         assert_eq!(message.return_code, ReturnCode::NotOk);
         assert_eq!(message.payload, 1u8);
-    }
-
-    #[test]
-    fn message_has_literal_representation() {
-        let message = Message::new(1u8)
-            .with_id(0x1234_5678)
-            .with_request(0x9abc_def0)
-            .with_type(MessageType::Response)
-            .with_code(ReturnCode::NotOk);
-        assert_eq!(message.to_string(), "1234.5678.9abc.def0.80.01");
     }
 
     // A message serialized with the SOME/IP format.

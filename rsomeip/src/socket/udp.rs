@@ -32,10 +32,15 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
+use super::ProtocolType;
+
 /// A thread-safe optional value.
 type SharedOption<T> = Arc<Mutex<Option<T>>>;
 /// Sends connections to the associated receiver.
 type ConnectionSender = mpsc::Sender<((UdpSender, UdpReceiver), SocketAddr)>;
+
+/// Max size of an UDP datagram in bytes.
+pub const MAX_DATAGRAM_SIZE: u32 = 1400;
 
 /// A socket of the UDP protocol.
 ///
@@ -130,6 +135,8 @@ impl Connector for UdpSocket {
     type Receiver = UdpReceiver;
     type Listener = UdpListener;
 
+    const PROTOCOL_TYPE: ProtocolType = ProtocolType::Datagram(MAX_DATAGRAM_SIZE);
+
     async fn connect(&mut self, address: &SocketAddr) -> IoResult<(Self::Sender, Self::Receiver)> {
         let (sender, receiver) = broadcast::channel(8);
         self.receivers.insert(*address, sender);
@@ -169,7 +176,7 @@ pub struct UdpSender {
 
 impl Sender for UdpSender {
     async fn send(&mut self, buffer: Bytes) -> Result<(), SendError<Bytes>> {
-        if buffer.len() > 1400 || self.token.is_cancelled() {
+        if buffer.len() > (MAX_DATAGRAM_SIZE as usize) || self.token.is_cancelled() {
             return Err(SendError(buffer));
         }
         self.socket

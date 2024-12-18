@@ -19,16 +19,16 @@ pub(crate) use port;
 ///    port in the range `49_152..65_535`.
 macro_rules! ipv4 {
     ([$($addr:tt),*], $port:tt) => {
-        std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new($($addr),*)), $port)
+        ::std::net::SocketAddr::new(::std::net::IpAddr::V4(::std::net::Ipv4Addr::new($($addr),*)), $port)
     };
     ([$($addr:tt),*]) => {
-        std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new($($addr),*)),
+        ::std::net::SocketAddr::new(::std::net::IpAddr::V4(::std::net::Ipv4Addr::new($($addr),*)),
         crate::testing::port!())
     };
     () => {
-        std::net::SocketAddr::new(
-            std::net::IpAddr::V4(
-                std::net::Ipv4Addr::new(127, 0, 0, crate::testing::gen_range(1..255))
+        ::std::net::SocketAddr::new(
+            ::std::net::IpAddr::V4(
+                ::std::net::Ipv4Addr::new(127, 0, 0, crate::testing::gen_range(1..255))
             ),
             crate::testing::port!()
         )
