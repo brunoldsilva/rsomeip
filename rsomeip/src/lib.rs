@@ -7,15 +7,25 @@
 //! SOME/IP, a message-based Inter-process Communication (IPC) protocol developed for the
 //! automotive industry.
 
-#![warn(clippy::nursery)]
-#![warn(clippy::pedantic)]
-#![warn(clippy::expect_used)]
-#![warn(clippy::unwrap_used)]
-#![allow(clippy::missing_const_for_fn)]
-#![allow(clippy::must_use_candidate)]
+#![warn(
+    clippy::nursery,
+    clippy::pedantic,
+    clippy::expect_used,
+    clippy::unwrap_used
+)]
+#![allow(
+    clippy::missing_const_for_fn,
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::future_not_send
+)]
 
 pub mod bytes;
-pub mod net;
+pub mod endpoint;
 pub mod socket;
 pub mod someip;
+pub(crate) mod support;
 pub(crate) mod testing;
+
+mod error;
+pub use error::{Error, Result};
