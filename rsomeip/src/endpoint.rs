@@ -32,7 +32,8 @@ pub trait Server {
 
     /// Serves the given service on this endpoint.
     ///
-    /// SOME/IP messages with matching id and interface version will be forwarded to the service.
+    /// SOME/IP messages with matching service id and interface version will be forwarded to the
+    /// [`Stub`].
     ///
     /// # Errors
     ///
@@ -40,19 +41,32 @@ pub trait Server {
     #[allow(async_fn_in_trait)]
     async fn serve(&mut self, interface: InterfaceId) -> Result<Self::Stub>;
 
-    /// Serves the given service on this endpoint.
+    /// Proxies the service at the given address.
     ///
-    /// SOME/IP messages with matching id and interface version will be forwarded to the service.
+    /// SOME/IP messages with matching service id and interface version will be forwarded to the
+    /// [`Proxy`].
     ///
     /// # Errors
     ///
-    /// Returns an error if the endpoint cannot create a listener for incoming connections.
+    /// Returns an error if a connection cannot be established to the remote address.
     #[allow(async_fn_in_trait)]
     async fn proxy(&mut self, interface: InterfaceId, address: SocketAddr) -> Result<Self::Proxy>;
 }
 
-/// A trait for managing a local service.
-pub trait Stub {
+/// A trait for communicating with multiple endpoints.
+pub trait Stub: Sender + Receiver {
+    /// Type of the stub's sender half.
+    type Sender: Sender + 'static;
+    /// Type of the stub's receiver half.
+    type Receiver: Receiver + 'static;
+
+    /// Splits the [`Stub`] into [`Sender`] and [`Receiver`] halves.
+    fn into_split(self) -> (Self::Sender, Self::Receiver);
+}
+
+/// A trait for sending messages to remote endpoints.
+#[allow(async_fn_in_trait)]
+pub trait Sender {
     /// Sends a message to the given address.
     ///
     /// This will attempt to establish a connection to the remote address, if one does not already
@@ -72,36 +86,52 @@ pub trait Stub {
     /// client be the one to establish the connection.
     ///
     /// [`ProtocolType`]: crate::socket::ProtocolType
-    #[allow(async_fn_in_trait)]
     async fn send_to(&mut self, address: SocketAddr, message: someip::Message<Bytes>)
         -> Result<()>;
+}
 
+/// A trait for receiving messages from remote endpoints.
+#[allow(async_fn_in_trait)]
+pub trait Receiver {
     /// Receives a message from a remote address.
     ///
     /// # Errors
     ///
     /// Returns an error if the endpoint has already been dropped.
-    #[allow(async_fn_in_trait)]
     async fn recv_from(&mut self) -> Result<(someip::Message<Bytes>, SocketAddr)>;
 }
 
-/// A trait for managing a local service.
-pub trait Proxy {
-    /// Sends a message to the given address.
+/// A trait for communicating with a single endpoint.
+pub trait Proxy: ConnectedSender + ConnectedReceiver {
+    /// Type of the proxy's sender half.
+    type Sender: ConnectedSender + 'static;
+    /// Type of the proxy's receiver half.
+    type Receiver: ConnectedReceiver + 'static;
+
+    /// Splits the [`Proxy`] into [`ConnectedSender`] and [`ConnectedReceiver`] halves.
+    fn into_split(self) -> (Self::Sender, Self::Receiver);
+}
+
+/// A trait for sending messages to a connected endpoints.
+#[allow(async_fn_in_trait)]
+pub trait ConnectedSender {
+    /// Sends a message to the connected endpoint.
     ///
     /// # Errors
     ///
-    /// Returns an error if the connection to the address is closed. if the endpoint had already
+    /// Returns an error if the connection to the address is closed. if the endpoint has already
     /// been dropped, or if the message is invalid.
-    #[allow(async_fn_in_trait)]
     async fn send(&mut self, message: someip::Message<Bytes>) -> Result<()>;
+}
 
-    /// Receives a message from a remote address.
+/// A trait for receiving messages from a connected endpoint.
+#[allow(async_fn_in_trait)]
+pub trait ConnectedReceiver {
+    /// Receives a message from the connected endpoint.
     ///
     /// # Errors
     ///
     /// Returns an error if the endpoint has already been dropped.
-    #[allow(async_fn_in_trait)]
     async fn recv(&mut self) -> Result<someip::Message<Bytes>>;
 }
 

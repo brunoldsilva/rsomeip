@@ -28,6 +28,24 @@ use interface::{Interface, Interfaces};
 mod listener;
 use listener::{Listener, WeakListener};
 
+/// Stub of a local service interface.
+///
+/// This is used to asynchronously send and receive SOME/IP messages from multiple remote endpoints.
+///
+/// [`Stub`] handles are created using the [`Endpoint::serve`] method.
+///
+/// [`Endpoint::serve`]: crate::endpoint::Server::serve
+pub type Stub = (Sender, Receiver);
+
+/// Proxy of a remote service interface.
+///
+/// This is used to asynchronously send and receive SOME/IP messages from the connected endpoint.
+///
+/// [`Proxy`] handles are created using the [`Endpoint::proxy`] method.
+///
+/// [`Endpoint::proxy`]: crate::endpoint::Server::proxy
+pub type Proxy = (ConnectedSender, ConnectedReceiver);
+
 /// Handle to an asynchronous SOME/IP endpoint.
 ///
 /// Used to create [`Stub`] and [`Proxy`] handles to service interfaces on local and remote
@@ -204,30 +222,38 @@ impl WeakEndpoint {
     }
 }
 
-/// Stub of a local service interface.
+impl endpoint::Stub for Stub {
+    type Sender = Sender;
+    type Receiver = Receiver;
+
+    // Splits the Stub into Sender and Receiver halves.
+    fn into_split(self) -> (Self::Sender, Self::Receiver) {
+        self
+    }
+}
+
+/// Sender half of a local service interface.
 ///
-/// This is used to asynchronously send and receive SOME/IP messages addressed to a specific
-/// service interface.
+/// This is used to asynchronously send SOME/IP messages to remote endpoints.
 ///
-/// Unlike a [`Proxy`] which can only communicate with one remote endpoint, a [`Stub`] is able
-/// to communicate with several remote endpoints simultaneously.
+/// Unlike a [`ConnectedSender`] which can only communicate with one remote endpoint, a [`Sender`]
+/// is able to communicate with several remote endpoints simultaneously.
 ///
-/// [`Stub`] handles are created using the [`Endpoint::serve`] method.
+/// [`Sender`] handles are created using the [`Endpoint::serve`] method.
+///
+/// See [`Receiver`] for the matching receiver half.
 ///
 /// [`Endpoint::serve`]: crate::endpoint::Server::serve
 #[must_use]
-pub struct Stub {
+#[derive(Debug)]
+pub struct Sender {
     /// Connections to remote endpoints.
     connections: Connections,
-    /// Incoming SOME/IP message receiver.
-    receiver: mpsc::Receiver<(someip::Message<Bytes>, SocketAddr)>,
     /// Non-owning handle to the endpoint.
     endpoint: WeakEndpoint,
-    /// Handle to the connection listener.
-    _listener: Listener,
 }
 
-impl Stub {
+impl Sender {
     /// Establishes a [`Connection`] to a remote endpoint.
     ///
     /// # Errors
@@ -245,7 +271,7 @@ impl Stub {
     }
 }
 
-impl endpoint::Stub for Stub {
+impl endpoint::Sender for Sender {
     // Sends the message to the given address.
     async fn send_to(
         &mut self,
@@ -257,7 +283,41 @@ impl endpoint::Stub for Stub {
         }
         self.connections.send_to(address, message).await
     }
+}
 
+impl endpoint::Sender for Stub {
+    // Sends the message to the given address.
+    async fn send_to(
+        &mut self,
+        address: SocketAddr,
+        message: someip::Message<Bytes>,
+    ) -> Result<()> {
+        self.0.send_to(address, message).await
+    }
+}
+
+/// Receiver half of a local service interface.
+///
+/// This is used to asynchronously receive SOME/IP messages from remote endpoints.
+///
+/// Unlike a [`ConnectedReceiver`] which can only communicate with one remote endpoint, a
+/// [`Receiver`] is able to communicate with several remote endpoints simultaneously.
+///
+/// [`Receiver`] handles are created using the [`Endpoint::serve`] method.
+///
+/// See [`Sender`] for the matching sender half.
+///
+/// [`Endpoint::serve`]: crate::endpoint::Server::serve
+#[must_use]
+#[derive(Debug)]
+pub struct Receiver {
+    /// Incoming SOME/IP message receiver.
+    receiver: mpsc::Receiver<(someip::Message<Bytes>, SocketAddr)>,
+    /// Handle to the connection listener.
+    _listener: Listener,
+}
+
+impl endpoint::Receiver for Receiver {
     // Receives a message from a remote address.
     async fn recv_from(&mut self) -> Result<(someip::Message<Bytes>, SocketAddr)> {
         match self.receiver.recv().await {
@@ -267,34 +327,78 @@ impl endpoint::Stub for Stub {
     }
 }
 
-/// Proxy of a remote service interface.
+impl endpoint::Receiver for Stub {
+    // Receives a message from a remote address.
+    async fn recv_from(&mut self) -> Result<(someip::Message<Bytes>, SocketAddr)> {
+        self.1.recv_from().await
+    }
+}
+
+impl endpoint::Proxy for Proxy {
+    type Sender = ConnectedSender;
+    type Receiver = ConnectedReceiver;
+
+    // Splits the Proxy into ConnectedSender and ConnectedReceiver halves.
+    fn into_split(self) -> (Self::Sender, Self::Receiver) {
+        self
+    }
+}
+
+/// Sender half to a remove service interface.
 ///
-/// This is used to asynchronously send and receive SOME/IP messages addressed to a specific
-/// service interface.
+/// This is used to asynchronously send SOME/IP messages to a remote endpoint.
 ///
-/// Unlike a [`Stub`] which can communicate with several remote endpoints simultaneously, a
-/// [`Proxy`] is only able to communicate with one remote endpoint.
+/// Unlike a [`Sender`] which can communicate with multiple remote endpoints simultaneously, a
+/// [`ConnectedSender`] is only able to communicate with the connected endpoint.
 ///
-/// [`Proxy`] handles are created using the [`Endpoint::proxy`] method.
+/// [`ConnectedSender`] handles are created using the [`Endpoint::proxy`] method.
+///
+/// See [`ConnectedReceiver`] for the matching receiver half.
 ///
 /// [`Endpoint::proxy`]: crate::endpoint::Server::proxy
 #[must_use]
 #[derive(Debug)]
-pub struct Proxy {
+pub struct ConnectedSender {
     /// Connection to remote endpoint.
     connection: Connection,
+}
+
+impl endpoint::ConnectedSender for ConnectedSender {
+    // Sends the message to the given address.
+    async fn send(&mut self, message: someip::Message<Bytes>) -> Result<()> {
+        self.connection.send(message).await
+    }
+}
+
+impl endpoint::ConnectedSender for Proxy {
+    // Sends the message to the given address.
+    async fn send(&mut self, message: someip::Message<Bytes>) -> Result<()> {
+        self.0.send(message).await
+    }
+}
+
+/// Receiver half to a remove service interface.
+///
+/// This is used to asynchronously receive SOME/IP messages from a remote endpoint.
+///
+/// Unlike a [`Receiver`] which can communicate with multiple remote endpoints simultaneously, a
+/// [`ConnectedReceiver`] is only able to communicate with the connected endpoint.
+///
+/// [`ConnectedReceiver`] handles are created using the [`Endpoint::proxy`] method.
+///
+/// See [`ConnectedSender`] for the matching sender half.
+///
+/// [`Endpoint::proxy`]: crate::endpoint::Server::proxy
+#[must_use]
+#[derive(Debug)]
+pub struct ConnectedReceiver {
     /// SOME/IP message receiver.
     receiver: mpsc::Receiver<(someip::Message<Bytes>, SocketAddr)>,
     /// Remote endpoint address.
     remote: SocketAddr,
 }
 
-impl endpoint::Proxy for Proxy {
-    // Sends the message to the given address.
-    async fn send(&mut self, message: someip::Message<Bytes>) -> Result<()> {
-        self.connection.send(message).await
-    }
-
+impl endpoint::ConnectedReceiver for ConnectedReceiver {
     // Receives a message from the remote address.
     async fn recv(&mut self) -> Result<someip::Message<Bytes>> {
         'recv: loop {
@@ -311,6 +415,12 @@ impl endpoint::Proxy for Proxy {
                 }
             }
         }
+    }
+}
+
+impl endpoint::ConnectedReceiver for Proxy {
+    async fn recv(&mut self) -> Result<someip::Message<Bytes>> {
+        self.1.recv().await
     }
 }
 
@@ -382,7 +492,7 @@ where
 
     /// Establishes a [`Connection`] to the given address.
     ///
-    /// This is meant to be called only by [`Stub`] trying to establish connections to remote
+    /// This is meant to be called only by a [`Stub`] trying to establish connections to remote
     /// endpoints.
     ///
     /// [`Proxy`] connections should be established using the [`EndpointTask::proxy`] or
@@ -399,6 +509,8 @@ where
     ///
     /// `Datagram` type protocols allow this behavior, but `Stream` type protocols require that the
     /// client be the one to establish the connection.
+    ///
+    /// [`ProtocolType`]: crate::socket::ProtocolType
     async fn connect(&mut self, address: SocketAddr) -> Result<Connection> {
         if matches!(C::PROTOCOL_TYPE, socket::ProtocolType::Datagram(_)) {
             let connection = self.connector.connect(&address).await?;
@@ -434,12 +546,16 @@ where
         listener.take(id, interface).await?;
 
         // Return a service stub.
-        Ok(Stub {
-            connections: self.connections.clone(),
-            _listener: listener,
-            receiver,
-            endpoint: self.endpoint.clone(),
-        })
+        Ok((
+            Sender {
+                connections: self.connections.clone(),
+                endpoint: self.endpoint.clone(),
+            },
+            Receiver {
+                receiver,
+                _listener: listener,
+            },
+        ))
     }
 
     /// Returns this endpoints [`Listener`] or creates a new one.
@@ -491,11 +607,13 @@ where
         connection.take(id, interface).await?;
 
         // Return a service proxy.
-        Ok(Proxy {
-            connection,
-            receiver,
-            remote: address,
-        })
+        Ok((
+            ConnectedSender { connection },
+            ConnectedReceiver {
+                receiver,
+                remote: address,
+            },
+        ))
     }
 
     /// Returns the [`Connection`] to the given address or creates a new one.
@@ -562,7 +680,9 @@ mod tests {
     use super::*;
     use crate::{
         bytes::Bytes,
-        endpoint::{Proxy as _, Server as _, Stub as _},
+        endpoint::{
+            ConnectedReceiver as _, ConnectedSender as _, Receiver as _, Sender as _, Server as _,
+        },
         socket::udp::UdpSocket,
         someip,
         testing::ipv4,
