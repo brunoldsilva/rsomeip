@@ -29,3 +29,6 @@ pub(crate) mod testing;
 
 mod error;
 pub use error::{Error, Result};
+
+pub mod runtime;
+pub use runtime::{Runtime, Scope};
