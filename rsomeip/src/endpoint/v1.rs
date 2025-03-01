@@ -512,7 +512,7 @@ where
     ///
     /// [`ProtocolType`]: crate::socket::ProtocolType
     async fn connect(&mut self, address: SocketAddr) -> Result<Connection> {
-        if matches!(C::PROTOCOL_TYPE, socket::ProtocolType::Datagram(_)) {
+        if matches!(C::PROTOCOL_TYPE, socket::Type::Datagram(_)) {
             let connection = self.connector.connect(&address).await?;
             Ok(Connection::spawn(
                 connection,

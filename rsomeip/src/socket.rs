@@ -50,7 +50,7 @@ pub trait Connector {
     type Listener: Listener + 'static;
 
     /// Type of the underlying protocol.
-    const PROTOCOL_TYPE: ProtocolType;
+    const PROTOCOL_TYPE: Type;
 
     /// Establishes a connection to the target address.
     ///
@@ -149,12 +149,12 @@ pub enum RecvError {
 ///
 /// The way an incoming connection is detected varies depending on the underlying protocol type.
 ///
-/// # Stream
+/// ## Stream
 ///
 /// Stream based listeners detect incoming streams created by remote sockets which target the
 /// address of the listener.
 ///
-/// # Datagram
+/// ## Datagram
 ///
 /// Datagram based listeners detect connections based on the source address of incoming packets.
 /// When accepting a connection, the received datagram will already be present in the [`Receiver`].
@@ -177,7 +177,7 @@ pub trait Listener {
 ///
 /// This is used to account for differences in individual protocol behavior, mainly to do with
 /// connection management, which might need to be accounted for by the user of the socket.
-pub enum ProtocolType {
+pub enum Type {
     /// Stream oriented communication.
     ///
     /// These types of sockets provide sequenced, reliable, two-way, connection-based byte streams.
@@ -187,4 +187,42 @@ pub enum ProtocolType {
     /// These types of sockets support datagrams (connectionless, unreliable messages of a fixed
     /// maximum length).
     Datagram(u32),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Protocol(pub u8);
+
+impl Protocol {
+    /// Transmission Control Protocol.
+    ///
+    /// TCP is a connection-oriented, reliable, ordered, and error-checked communication
+    /// protocol of the Internet Protocol suite.
+    pub const TCP: Self = Self(0x06);
+
+    /// User Datagram Protocol.
+    ///
+    /// UDP is a connection-less, datagram-based communication protocol of the Internet
+    /// Protocol suite designed for speed and efficiency.
+    pub const UDP: Self = Self(0x11);
+}
+
+impl std::fmt::Display for Protocol {
+    /// Formats the [`Protocol`] into a string.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip::socket::Protocol;
+    ///
+    /// assert_eq!(format!("{}", Protocol::UDP), "UDP");
+    /// assert_eq!(format!("{}", Protocol::TCP), "TCP");
+    /// assert_eq!(format!("{}", Protocol(0x01)), "0x01");
+    /// ```
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Self::TCP => write!(f, "TCP"),
+            Self::UDP => write!(f, "UDP"),
+            Self(other) => write!(f, "0x{other:02x?}"),
+        }
+    }
 }

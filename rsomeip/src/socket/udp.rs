@@ -32,7 +32,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-use super::ProtocolType;
+use super::Type;
 
 /// A thread-safe optional value.
 type SharedOption<T> = Arc<Mutex<Option<T>>>;
@@ -135,7 +135,7 @@ impl Connector for UdpSocket {
     type Receiver = UdpReceiver;
     type Listener = UdpListener;
 
-    const PROTOCOL_TYPE: ProtocolType = ProtocolType::Datagram(MAX_DATAGRAM_SIZE);
+    const PROTOCOL_TYPE: Type = Type::Datagram(MAX_DATAGRAM_SIZE);
 
     async fn connect(&mut self, address: &SocketAddr) -> IoResult<(Self::Sender, Self::Receiver)> {
         let (sender, receiver) = broadcast::channel(8);

@@ -12,6 +12,62 @@ mod task;
 pub use task::Scope;
 use task::Task;
 
+mod registry {
+    use crate::{endpoint::InterfaceId, someip::InstanceId};
+    use std::{net::SocketAddr, num::NonZero};
+
+    pub struct Registry {
+        interfaces: scc::HashMap<InterfaceId, InterfaceInfo>,
+    }
+
+    pub struct InterfaceInfo {
+        instances: scc::HashMap<InstanceId, InstanceInfo>,
+    }
+
+    pub struct InstanceInfo {
+        endpoints: scc::HashSet<(SocketAddr, Protocol)>,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct Protocol(pub u8);
+
+    impl Protocol {
+        /// Transmission Control Protocol.
+        ///
+        /// TCP is a connection-oriented, reliable, ordered, and error-checked communication
+        /// protocol of the Internet Protocol suite.
+        pub const TCP: Self = Self(0x06);
+
+        /// User Datagram Protocol.
+        ///
+        /// UDP is a connection-less, datagram-based communication protocol of the Internet
+        /// Protocol suite designed for speed and efficiency.
+        pub const UDP: Self = Self(0x11);
+    }
+
+    impl std::fmt::Display for Protocol {
+        /// Formats the [`Protocol`] into a string.
+        ///
+        /// # Examples
+        ///
+        /// ```rust
+        /// use rsomeip::runtime::Protocol;
+        ///
+        /// assert_eq!(format!("{}", Protocol::UDP), "UDP");
+        /// assert_eq!(format!("{}", Protocol::TCP), "TCP");
+        /// assert_eq!(format!("{}", Protocol(0x01)), "Other(01)");
+        /// ```
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match *self {
+                Self::TCP => write!(f, "TCP"),
+                Self::UDP => write!(f, "UDP"),
+                Self(other) => write!(f, "Other({other:02x?})"),
+            }
+        }
+    }
+}
+pub use registry::Protocol;
+
 /// SOME/IP asynchronous runtime.
 ///
 /// Used to create service interfaces and communicate with other SOME/IP applications

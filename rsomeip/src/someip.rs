@@ -35,6 +35,9 @@ pub type ProtocolVersion = u8;
 /// Major version of the service referenced by the [`ServiceId`].
 pub type InterfaceVersion = u8;
 
+/// Identifier of single service instance on the network.
+pub type InstanceId = u16;
+
 /// Size in bytes of a SOME/IP header.
 pub const HEADER_SIZE: usize = 16;
 

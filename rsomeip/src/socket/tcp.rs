@@ -23,7 +23,7 @@ use crate::socket::{
 use bytes::Bytes;
 use tokio::net;
 
-use super::ProtocolType;
+use super::Type;
 
 /// A socket of the TCP protocol.
 ///
@@ -94,7 +94,7 @@ impl Connector for TcpSocket {
     type Receiver = TcpReceiver;
     type Listener = TcpListener;
 
-    const PROTOCOL_TYPE: ProtocolType = ProtocolType::Stream;
+    const PROTOCOL_TYPE: Type = Type::Stream;
 
     async fn connect(&mut self, address: &SocketAddr) -> IoResult<(Self::Sender, Self::Receiver)> {
         let socket = match self.address {
