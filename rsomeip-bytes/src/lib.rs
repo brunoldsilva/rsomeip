@@ -35,6 +35,8 @@ pub use de::{Deserialize, DeserializeError};
 mod ser;
 pub use ser::{Serialize, SerializeError, SerializeString};
 
+mod macros;
+
 /// Size of the length field.
 ///
 /// The size of a dynamic payload is encoded in a preceding length field which can be 1, 2, or 4

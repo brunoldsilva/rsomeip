@@ -122,6 +122,19 @@ impl Serialize for bool {
     }
 }
 
+impl<T> Serialize for &T
+where
+    T: Serialize,
+{
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
+        (*self).serialize(buffer)
+    }
+
+    fn size_hint(&self) -> usize {
+        (*self).size_hint()
+    }
+}
+
 impl<T> Serialize for &[T]
 where
     T: Serialize,
