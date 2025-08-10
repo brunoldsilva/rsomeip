@@ -437,6 +437,7 @@ mod tests {
                 let mut buffer = BytesMut::with_capacity(size_of::<$t>());
                 let result = <$t>::MAX.serialize(&mut buffer);
                 assert_eq!(result, Ok(size_of::<$t>()));
+                assert_eq!(result, Ok(<$t>::MAX.size_hint()));
                 assert_eq!(&buffer.freeze()[..], <$t>::MAX.to_be_bytes());
             }
         };
@@ -456,7 +457,11 @@ mod tests {
     #[test]
     fn serialize_bool() {
         let mut buffer = BytesMut::with_capacity(1);
-        assert_eq!(true.serialize(&mut buffer), Ok(1));
+        let size = true
+            .serialize(&mut buffer)
+            .expect("should serialize the bool");
+        assert_eq!(size, 1);
+        assert_eq!(true.size_hint(), 1);
         assert_eq!(&buffer.freeze()[..], &[1u8]);
     }
 
@@ -476,6 +481,7 @@ mod tests {
             .serialize(&mut buffer)
             .expect("should serialize the vec");
         assert_eq!(size, 2);
+        assert_eq!(size, vec.size_hint());
         assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
     }
 
@@ -487,6 +493,7 @@ mod tests {
             .serialize(&mut buffer)
             .expect("should serialize the array");
         assert_eq!(size, 2);
+        assert_eq!(size, array.size_hint());
         assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
     }
 
@@ -498,6 +505,7 @@ mod tests {
             .serialize(&mut buffer)
             .expect("should serialize the tuple");
         assert_eq!(size, 2);
+        assert_eq!(size, tuple.size_hint());
         assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
     }
 
@@ -505,7 +513,11 @@ mod tests {
     fn serialize_bytes() {
         let mut buffer = BytesMut::with_capacity(2);
         let bytes = Bytes::copy_from_slice(&[1u8, 2u8]);
-        assert_eq!(bytes.serialize(&mut buffer), Ok(2));
+        let size = bytes
+            .serialize(&mut buffer)
+            .expect("should serialize the buffer");
+        assert_eq!(size, 2);
+        assert_eq!(size, bytes.size_hint());
         assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
     }
 
