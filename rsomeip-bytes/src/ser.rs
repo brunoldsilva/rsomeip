@@ -65,20 +65,43 @@ pub trait Serialize {
     ) -> Result<usize, SerializeError> {
         let mut size = match length {
             LengthField::U8 => u8::try_from(self.size_hint())
-                .map_err(|_| SerializeError)?
+                .map_err(|_| SerializeError::InvalidLength {
+                    required: self.size_hint(),
+                    maximum: u8::MAX as usize,
+                })?
                 .serialize(buffer)?,
             LengthField::U16 => u16::try_from(self.size_hint())
-                .map_err(|_| SerializeError)?
+                .map_err(|_| SerializeError::InvalidLength {
+                    required: self.size_hint(),
+                    maximum: u16::MAX as usize,
+                })?
                 .serialize(buffer)?,
             LengthField::U32 => u32::try_from(self.size_hint())
-                .map_err(|_| SerializeError)?
+                .map_err(|_| SerializeError::InvalidLength {
+                    required: self.size_hint(),
+                    maximum: u32::MAX as usize,
+                })?
                 .serialize(buffer)?,
         };
         size += self.serialize(buffer)?;
         Ok(size)
     }
 
-    /// Returns the expected size of the serialized data.
+    /// Returns the expected length of the serialized data.
+    ///
+    /// When using [`serialize_len`], the length field is serialized before the type itself.
+    ///
+    /// This method serves as way to calculate the length of the serialized type before serializing it.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip_bytes::Serialize;
+    ///
+    /// assert_eq!(0u8.size_hint(), 1);
+    /// assert_eq!(0u32.size_hint(), 4);
+    /// assert_eq!(vec![1u8, 2, 3].size_hint(), 3);
+    /// ```
     fn size_hint(&self) -> usize;
 }
 
@@ -422,9 +445,17 @@ enum Endianness {
     Big,
 }
 
-/// Represents an error when serializing data.
-#[derive(Debug, PartialEq, Eq)]
-pub struct SerializeError;
+/// Represents an error during the serialization process.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum SerializeError {
+    /// The length of the serialized type does not fit inside the length field.
+    #[error("length exceeds capacity of length field: {required} vs {maximum}")]
+    InvalidLength { required: usize, maximum: usize },
+    /// Some other error has occurred.
+    #[error("{0}")]
+    Other(String),
+}
 
 #[cfg(test)]
 mod tests {
