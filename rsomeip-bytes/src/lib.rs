@@ -1,30 +1,4 @@
-//! Data serialization according to the SOME/IP protocol.
-//!
-//! This crate provides traits for serializing and deserializing data structures according to the
-//! on-wire format of the SOME/IP protocol:
-//!
-//! - [`Deserialize`] provides methods for extracting data structures from bytes.
-//!
-//! - [`Serialize`] provides methods for writing data structures to bytes.
-//!
-//!   - [`SerializeString`] provides methods for writing strings to bytes using UTF-8, UTF-16-BE
-//!     and UTF-16-LE encodings.
-//!
-//! Additionally, this crate also provides implementations of these traits for all basic types and
-//! some common structures of the Rust library.
-
-#![warn(
-    clippy::nursery,
-    clippy::pedantic,
-    clippy::expect_used,
-    clippy::unwrap_used
-)]
-#![allow(
-    clippy::missing_const_for_fn,
-    clippy::module_name_repetitions,
-    clippy::must_use_candidate,
-    clippy::future_not_send
-)]
+#![doc = include_str!("../README.md")]
 
 // Re-export for convenience.
 pub use bytes::{Buf, BufMut, Bytes, BytesMut};

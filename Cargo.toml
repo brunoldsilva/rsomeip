@@ -1,3 +1,19 @@
+# rsomeip cargo workspace manifest.
+# More info: <https://doc.rust-lang.org/cargo/reference/workspaces.html>
+
 [workspace]
-resolver = "2"
 members = ["rsomeip", "rsomeip-bytes"]
+resolver = "2"
+
+[workspace.package]
+authors = ["Bruno Silva <brunoldsilva@pm.me>"]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/brunoldsilva/rsomeip"
+
+[workspace.lints.clippy]
+nursery = { level = "warn", priority = -1 }  # Makes clippy even more pedantic.
+pedantic = { level = "warn", priority = -1 } # Helps identify simple improvements.
+unwrap_used = "warn"                         # Prefer error handling/propagation instead of panics.
+expect_used = "warn"                         # Same as unwrap, but can be used in tests.
+module_name_repetitions = "allow"            # Module name repetitions are fine.

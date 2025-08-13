@@ -102,6 +102,8 @@ pub trait Serialize {
     /// assert_eq!(0u32.size_hint(), 4);
     /// assert_eq!(vec![1u8, 2, 3].size_hint(), 3);
     /// ```
+    ///
+    /// [`serialize_len`]: Serialize::serialize_len
     fn size_hint(&self) -> usize;
 }
 
