@@ -12,11 +12,11 @@
 //! - [`Proxy`] is used to send and receive messages from a single remote endpoint.
 
 use crate::{
-    bytes::Bytes,
     endpoint::{self, InterfaceId},
     socket::{self, SocketAddr},
     someip, Result,
 };
+use rsomeip_bytes::Bytes;
 use tokio::sync::{mpsc, oneshot};
 
 mod connection;
@@ -561,7 +561,6 @@ enum Command {
 mod tests {
     use super::*;
     use crate::{
-        bytes::Bytes,
         endpoint::{Proxy as _, Server as _, Stub as _},
         socket::udp::UdpSocket,
         someip,

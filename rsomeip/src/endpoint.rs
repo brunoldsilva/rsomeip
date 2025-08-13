@@ -15,7 +15,8 @@
 //!
 //! - [`v1`] is a concrete implementation of Version 1 of the SOME/IP protocol.
 
-use crate::{bytes::Bytes, socket::SocketAddr, someip, Result};
+use crate::{socket::SocketAddr, someip, Result};
+use rsomeip_bytes::Bytes;
 
 pub mod v1;
 

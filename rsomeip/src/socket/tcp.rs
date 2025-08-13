@@ -20,7 +20,7 @@
 use crate::socket::{
     Connector, IoResult, Listener, Receiver, RecvError, SendError, Sender, SocketAddr,
 };
-use bytes::Bytes;
+use rsomeip_bytes::Bytes;
 use tokio::net;
 
 use super::ProtocolType;
@@ -36,7 +36,7 @@ use super::ProtocolType;
 /// ```rust
 /// # tokio_test::block_on(async move {
 /// use rsomeip::socket::{SocketAddr, Connector, Sender, tcp::TcpSocket};
-/// use bytes::Bytes;
+/// use rsomeip_bytes::Bytes;
 /// let local_address: SocketAddr = "127.0.0.1:30501".parse().unwrap();
 /// let mut socket = TcpSocket::new(local_address);
 ///
@@ -56,7 +56,7 @@ use super::ProtocolType;
 /// ```rust
 /// # tokio_test::block_on(async move {
 /// use rsomeip::socket::{SocketAddr, Connector, Receiver, Listener, tcp::TcpSocket};
-/// use bytes::Bytes;
+/// use rsomeip_bytes::Bytes;
 /// let local_address: SocketAddr = "127.0.0.1:30502".parse().unwrap();
 /// let mut socket = TcpSocket::new(local_address);
 ///

@@ -21,7 +21,7 @@
 //!
 //! A basic socket implementation of this protocol is provided by the [`udp`] module.
 
-use bytes::Bytes;
+use rsomeip_bytes::Bytes;
 
 /// Re-export for convenience.
 pub use std::net::SocketAddr;
