@@ -1,0 +1,15 @@
+[package]
+name = "rsomeip-proto"
+version = "0.1.0"
+description = "Sans-IO implementation of the Scalable service-Oriented MiddlewarE over IP (SOME/IP) protocol."
+
+# Inherited from workspace.
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
