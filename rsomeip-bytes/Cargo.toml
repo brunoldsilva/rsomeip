@@ -6,6 +6,11 @@ name = "rsomeip-bytes"
 version = "0.1.0"
 description = "Serialization crate for the SOME/IP on-wire format."
 documentation = "https://docs.rs/rsomeip-bytes"
+readme = "README.md"
+keywords = ["someip", "bytes", "serialization"]
+categories = ["automotive"]
+
+# Inherited from workspace.
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
