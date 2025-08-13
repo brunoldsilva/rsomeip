@@ -21,7 +21,7 @@ use crate::{
     socket::{Connector, IoResult, Listener, Receiver, RecvError, SendError, Sender, SocketAddr},
     support::collections::SharedMap,
 };
-use bytes::Bytes;
+use rsomeip_bytes::Bytes;
 use std::{
     net::Ipv4Addr,
     sync::{Arc, Mutex},
@@ -53,7 +53,7 @@ pub const MAX_DATAGRAM_SIZE: u32 = 1400;
 /// ```rust
 /// # tokio_test::block_on(async move {
 /// use rsomeip::socket::{SocketAddr, Connector, Sender, udp::UdpSocket};
-/// use bytes::Bytes;
+/// use rsomeip_bytes::Bytes;
 /// let local_address: SocketAddr = "127.0.0.1:30503".parse().unwrap();
 /// let mut socket = UdpSocket::bind(local_address).await.unwrap();
 ///
@@ -68,7 +68,7 @@ pub const MAX_DATAGRAM_SIZE: u32 = 1400;
 /// ```rust
 /// # tokio_test::block_on(async move {
 /// use rsomeip::socket::{SocketAddr, Connector, Receiver, Listener, udp::UdpSocket};
-/// use bytes::Bytes;
+/// use rsomeip_bytes::Bytes;
 /// let local_address: SocketAddr = "127.0.0.1:30504".parse().unwrap();
 /// let mut socket = UdpSocket::bind(local_address).await.unwrap();
 ///
@@ -326,7 +326,7 @@ impl Listener for UdpListener {
 mod tests {
     use super::*;
     use crate::testing::ipv4;
-    use bytes::BytesMut;
+    use rsomeip_bytes::BytesMut;
 
     #[tokio::test]
     async fn socket_binds_to_unicast() {

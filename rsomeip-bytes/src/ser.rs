@@ -7,7 +7,7 @@ use super::{BufMut, Bytes, BytesMut, LengthField};
 
 /// Serialize data into a SOME/IP byte stream.
 ///
-/// This trait provides methods for serializing data structures into a byte stream ([`BytesMut`])
+/// This trait provides methods for serializing data structures into a byte stream ([`BufMut`])
 /// encoded in the SOME/IP on-wire format.
 ///
 /// [`serialize`] is used to serialize statically sized types, while [`serialize_len`] is used to
@@ -28,13 +28,13 @@ pub trait Serialize {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip::bytes::{BytesMut, Serialize};
+    /// use rsomeip_bytes::{BytesMut, Serialize};
     /// let mut buffer = BytesMut::with_capacity(3);
     /// assert_eq!(1u8.serialize(&mut buffer), Ok(1));
     /// assert_eq!(2u16.serialize(&mut buffer), Ok(2));
     /// assert_eq!(&buffer.freeze()[..], &[1u8, 0u8, 2u8][..]);
     /// ```
-    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, SerializeError>;
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError>;
 
     /// Serializes the implementing type into the buffer.
     ///
@@ -52,7 +52,7 @@ pub trait Serialize {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip::bytes::{BytesMut, Serialize, LengthField};
+    /// use rsomeip_bytes::{BytesMut, Serialize, LengthField};
     /// let mut buffer = BytesMut::with_capacity(3);
     /// let vec = vec![0u8, 1u8];
     /// assert_eq!(vec.serialize_len(LengthField::U8, &mut buffer), Ok(3));
@@ -61,52 +61,62 @@ pub trait Serialize {
     fn serialize_len(
         &self,
         length: LengthField,
-        buffer: &mut BytesMut,
+        buffer: &mut impl BufMut,
     ) -> Result<usize, SerializeError> {
-        // Generic function to reduce code duplication from matching on `length`.
-        fn serialize_len_internal<S, T, F>(
-            data: &S,
-            buffer: &mut BytesMut,
-            write_length: F,
-        ) -> Result<usize, SerializeError>
-        where
-            S: Serialize + ?Sized,
-            T: TryFrom<usize>,
-            F: FnOnce(&mut BytesMut, T),
-        {
-            // Split off a buffer for writing the payload and length field separately.
-            if size_of::<T>() > buffer.capacity() {
-                buffer.reserve(size_of::<T>());
-            }
-            let mut payload = buffer.split_off(size_of::<T>());
-
-            // Serialize the payload first to get its size.
-            let length = data.serialize(&mut payload)?;
-
-            // Try serializing the length field itself.
-            T::try_from(length)
-                .map_err(|_| SerializeError)
-                .map(|length| write_length(buffer, length))?;
-
-            // Finally, rejoin the payload and length buffers.
-            buffer.unsplit(payload);
-            Ok(size_of::<T>() + length)
-        }
-        match length {
-            LengthField::U8 => serialize_len_internal(self, buffer, BytesMut::put_u8),
-            LengthField::U16 => serialize_len_internal(self, buffer, BytesMut::put_u16),
-            LengthField::U32 => serialize_len_internal(self, buffer, BytesMut::put_u32),
-        }
+        let mut size = match length {
+            LengthField::U8 => u8::try_from(self.size_hint())
+                .map_err(|_| SerializeError::InvalidLength {
+                    required: self.size_hint(),
+                    maximum: u8::MAX as usize,
+                })?
+                .serialize(buffer)?,
+            LengthField::U16 => u16::try_from(self.size_hint())
+                .map_err(|_| SerializeError::InvalidLength {
+                    required: self.size_hint(),
+                    maximum: u16::MAX as usize,
+                })?
+                .serialize(buffer)?,
+            LengthField::U32 => u32::try_from(self.size_hint())
+                .map_err(|_| SerializeError::InvalidLength {
+                    required: self.size_hint(),
+                    maximum: u32::MAX as usize,
+                })?
+                .serialize(buffer)?,
+        };
+        size += self.serialize(buffer)?;
+        Ok(size)
     }
+
+    /// Returns the expected length of the serialized data.
+    ///
+    /// When using [`serialize_len`], the length field is serialized before the type itself.
+    ///
+    /// This method serves as way to calculate the length of the serialized type before serializing it.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rsomeip_bytes::Serialize;
+    ///
+    /// assert_eq!(0u8.size_hint(), 1);
+    /// assert_eq!(0u32.size_hint(), 4);
+    /// assert_eq!(vec![1u8, 2, 3].size_hint(), 3);
+    /// ```
+    ///
+    /// [`serialize_len`]: Serialize::serialize_len
+    fn size_hint(&self) -> usize;
 }
 
 macro_rules! serialize_basic_type {
     ($t:ty, $f:ident) => {
         impl Serialize for $t {
-            fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, SerializeError> {
-                buffer.reserve(size_of::<$t>());
-                BytesMut::$f(buffer, *self);
+            fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
+                BufMut::$f(buffer, *self);
                 Ok(size_of::<$t>())
+            }
+
+            fn size_hint(&self) -> usize {
+                size_of::<$t>()
             }
         }
     };
@@ -124,25 +134,50 @@ serialize_basic_type!(f32, put_f32);
 serialize_basic_type!(f64, put_f64);
 
 impl Serialize for bool {
-    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, SerializeError> {
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
         if *self {
             1u8.serialize(buffer)
         } else {
             0u8.serialize(buffer)
         }
     }
+
+    fn size_hint(&self) -> usize {
+        size_of::<u8>()
+    }
 }
 
-impl<T> Serialize for [T]
+impl<T> Serialize for &T
 where
     T: Serialize,
 {
-    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, SerializeError> {
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
+        (*self).serialize(buffer)
+    }
+
+    fn size_hint(&self) -> usize {
+        (*self).size_hint()
+    }
+}
+
+impl<T> Serialize for &[T]
+where
+    T: Serialize,
+{
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
         let mut total = 0;
-        for element in self {
+        for element in *self {
             total += element.serialize(buffer)?;
         }
         Ok(total)
+    }
+
+    fn size_hint(&self) -> usize {
+        let mut total = 0;
+        for element in *self {
+            total += element.size_hint();
+        }
+        total
     }
 }
 
@@ -150,8 +185,12 @@ impl<T> Serialize for Vec<T>
 where
     T: Serialize,
 {
-    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, SerializeError> {
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
         self.as_slice().serialize(buffer)
+    }
+
+    fn size_hint(&self) -> usize {
+        self.as_slice().size_hint()
     }
 }
 
@@ -159,17 +198,12 @@ impl<T, const N: usize> Serialize for [T; N]
 where
     T: Serialize,
 {
-    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, SerializeError> {
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
         self.as_slice().serialize(buffer)
     }
-}
 
-impl<T> Serialize for T
-where
-    T: Fn(&mut BytesMut) -> Result<usize, SerializeError>,
-{
-    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, SerializeError> {
-        self(buffer)
+    fn size_hint(&self) -> usize {
+        self.as_slice().size_hint()
     }
 }
 
@@ -178,11 +212,19 @@ macro_rules! serialize_tuple {
         impl<$($name: Serialize),+> Serialize for ($($name,)+)
         {
             #[allow(non_snake_case)]
-            fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, SerializeError> {
+            fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
                 let ($($name,)+) = self;
                 let mut total = 0;
                 $(total += $name.serialize(buffer)?;)+
                 Ok(total)
+            }
+
+            #[allow(non_snake_case)]
+            fn size_hint(&self) -> usize {
+                let ($($name,)+) = self;
+                let mut total = 0;
+                $(total += $name.size_hint();)+
+                total
             }
         }
     };
@@ -202,9 +244,13 @@ serialize_tuple! { A B C D E F G H I J K }
 serialize_tuple! { A B C D E F G H I J K L }
 
 impl Serialize for Bytes {
-    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, SerializeError> {
-        buffer.extend_from_slice(&self[..]);
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
+        buffer.put_slice(self);
         Ok(self.len())
+    }
+
+    fn size_hint(&self) -> usize {
+        self.len()
     }
 }
 
@@ -229,7 +275,7 @@ pub trait SerializeString {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip::bytes::{SerializeString, BytesMut};
+    /// use rsomeip_bytes::{SerializeString, BytesMut};
     /// let mut buffer = BytesMut::with_capacity(10);
     /// assert_eq!("Hello!".serialize_utf8(&mut buffer, None), Ok(10));
     /// assert_eq!(
@@ -260,7 +306,7 @@ pub trait SerializeString {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip::bytes::{SerializeString, BytesMut};
+    /// use rsomeip_bytes::{SerializeString, BytesMut};
     /// let mut buffer = BytesMut::with_capacity(12);
     /// assert_eq!("语言处理".serialize_utf16_be(&mut buffer, None), Ok(12));
     /// assert_eq!(
@@ -291,7 +337,7 @@ pub trait SerializeString {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip::bytes::{SerializeString, BytesMut};
+    /// use rsomeip_bytes::{SerializeString, BytesMut};
     /// let mut buffer = BytesMut::with_capacity(12);
     /// assert_eq!("语言处理".serialize_utf16_le(&mut buffer, None), Ok(12));
     /// assert_eq!(
@@ -310,68 +356,108 @@ pub trait SerializeString {
     ) -> Result<usize, SerializeError>;
 }
 
-impl SerializeString for str {
+impl SerializeString for &str {
     fn serialize_utf8(
         &self,
         buffer: &mut BytesMut,
         len: Option<LengthField>,
     ) -> Result<usize, SerializeError> {
-        let serialize_op = |buffer: &mut BytesMut| {
-            [0xef_u8, 0xbb, 0xbf].serialize(buffer)?; // Byte Order Mark.
-            let size = self.as_bytes().serialize(buffer)?;
-            0x00_u8.serialize(buffer)?; // Delimiter.
-            Ok(size + 4)
-        };
+        let data = (
+            [0xef_u8, 0xbb, 0xbf], // Byte Order Mark.
+            self.as_bytes(),
+            0x00_u8, // Delimiter.
+        );
         match len {
-            Some(len) => serialize_op.serialize_len(len, buffer),
-            None => serialize_op.serialize(buffer),
+            Some(len) => data.serialize_len(len, buffer),
+            None => data.serialize(buffer),
         }
     }
 
     fn serialize_utf16_be(
         &self,
         buffer: &mut BytesMut,
-        len: Option<LengthField>,
+        length: Option<LengthField>,
     ) -> Result<usize, SerializeError> {
-        let serialize_op = |buffer: &mut BytesMut| {
-            0xfeff_u16.serialize(buffer)?; // Byte Order Mark.
-            let mut total = 0;
-            for byte in self.encode_utf16() {
-                total += byte.serialize(buffer)?;
-            }
-            0x0000_u16.serialize(buffer)?; // Delimiter.
-            Ok(total + 4)
+        let string = Utf16String {
+            inner: self,
+            endianness: Endianness::Big,
         };
-        match len {
-            Some(len) => serialize_op.serialize_len(len, buffer),
-            None => serialize_op.serialize(buffer),
+        match length {
+            Some(length) => string.serialize_len(length, buffer),
+            None => string.serialize(buffer),
         }
     }
 
     fn serialize_utf16_le(
         &self,
         buffer: &mut BytesMut,
-        len: Option<LengthField>,
+        length: Option<LengthField>,
     ) -> Result<usize, SerializeError> {
-        let serialize_op = |buffer: &mut BytesMut| {
-            0xfffe_u16.serialize(buffer)?; // Byte Order Mark.
-            let mut total = 0;
-            for byte in self.encode_utf16() {
-                total += byte.to_le_bytes().serialize(buffer)?;
-            }
-            0x0000_u16.serialize(buffer)?; // Delimiter.
-            Ok(total + 4)
+        let string = Utf16String {
+            inner: self,
+            endianness: Endianness::Little,
         };
-        match len {
-            Some(len) => serialize_op.serialize_len(len, buffer),
-            None => serialize_op.serialize(buffer),
+        match length {
+            Some(length) => string.serialize_len(length, buffer),
+            None => string.serialize(buffer),
         }
     }
 }
 
-/// Represents an error when serializing data.
-#[derive(Debug, PartialEq, Eq)]
-pub struct SerializeError;
+/// A wrapper for serializing UTF-16 strings.
+#[derive(Debug)]
+struct Utf16String<'a> {
+    inner: &'a str,
+    endianness: Endianness,
+}
+
+impl Serialize for Utf16String<'_> {
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
+        let mut size = 0;
+        match self.endianness {
+            Endianness::Little => {
+                size += 0xfffe_u16.serialize(buffer)?; // Byte Order Mark.
+                for value in self.inner.encode_utf16() {
+                    size += value.to_le_bytes().serialize(buffer)?;
+                }
+            }
+            Endianness::Big => {
+                size += 0xfeff_u16.serialize(buffer)?; // Byte Order Mark.
+                for value in self.inner.encode_utf16() {
+                    size += value.to_be_bytes().serialize(buffer)?;
+                }
+            }
+        }
+        size += 0x0000_u16.serialize(buffer)?; // Delimiter.
+        Ok(size)
+    }
+
+    fn size_hint(&self) -> usize {
+        let mut size = size_of::<u16>() * 2; // Byte Order Mark + Delimiter.
+        for _ in self.inner.encode_utf16() {
+            size += size_of::<u16>();
+        }
+        size
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Endianness {
+    Little,
+    Big,
+}
+
+/// Represents an error during the serialization process.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum SerializeError {
+    /// The length of the serialized type does not fit inside the length field.
+    #[error("length exceeds capacity of length field: {required} vs {maximum}")]
+    InvalidLength { required: usize, maximum: usize },
+    /// Some other error has occurred.
+    #[error("{0}")]
+    Other(String),
+}
 
 #[cfg(test)]
 mod tests {
@@ -384,6 +470,7 @@ mod tests {
                 let mut buffer = BytesMut::with_capacity(size_of::<$t>());
                 let result = <$t>::MAX.serialize(&mut buffer);
                 assert_eq!(result, Ok(size_of::<$t>()));
+                assert_eq!(result, Ok(<$t>::MAX.size_hint()));
                 assert_eq!(&buffer.freeze()[..], <$t>::MAX.to_be_bytes());
             }
         };
@@ -403,7 +490,11 @@ mod tests {
     #[test]
     fn serialize_bool() {
         let mut buffer = BytesMut::with_capacity(1);
-        assert_eq!(true.serialize(&mut buffer), Ok(1));
+        let size = true
+            .serialize(&mut buffer)
+            .expect("should serialize the bool");
+        assert_eq!(size, 1);
+        assert_eq!(true.size_hint(), 1);
         assert_eq!(&buffer.freeze()[..], &[1u8]);
     }
 
@@ -423,6 +514,7 @@ mod tests {
             .serialize(&mut buffer)
             .expect("should serialize the vec");
         assert_eq!(size, 2);
+        assert_eq!(size, vec.size_hint());
         assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
     }
 
@@ -434,21 +526,7 @@ mod tests {
             .serialize(&mut buffer)
             .expect("should serialize the array");
         assert_eq!(size, 2);
-        assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
-    }
-
-    #[test]
-    fn serialize_fn() {
-        let mut buffer = BytesMut::with_capacity(2);
-        let fun = |buffer: &mut BytesMut| {
-            1u8.serialize(buffer)?;
-            2u8.serialize(buffer)?;
-            Ok(2usize)
-        };
-        let size = fun
-            .serialize(&mut buffer)
-            .expect("should serialize the function");
-        assert_eq!(size, 2);
+        assert_eq!(size, array.size_hint());
         assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
     }
 
@@ -460,6 +538,7 @@ mod tests {
             .serialize(&mut buffer)
             .expect("should serialize the tuple");
         assert_eq!(size, 2);
+        assert_eq!(size, tuple.size_hint());
         assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
     }
 
@@ -467,7 +546,11 @@ mod tests {
     fn serialize_bytes() {
         let mut buffer = BytesMut::with_capacity(2);
         let bytes = Bytes::copy_from_slice(&[1u8, 2u8]);
-        assert_eq!(bytes.serialize(&mut buffer), Ok(2));
+        let size = bytes
+            .serialize(&mut buffer)
+            .expect("should serialize the buffer");
+        assert_eq!(size, 2);
+        assert_eq!(size, bytes.size_hint());
         assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
     }
 

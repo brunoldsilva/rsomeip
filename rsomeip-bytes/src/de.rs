@@ -7,7 +7,7 @@ use super::{Buf, Bytes, LengthField};
 
 /// Deserialize data from a SOME/IP byte stream.
 ///
-/// This trait provides methods for deserializing data structures from a byte stream ([`Bytes`])
+/// This trait provides methods for deserializing data structures from a byte stream ([`Buf`])
 /// encoded in the SOME/IP on-wire format.
 ///
 /// [`deserialize`] is used to deserialize statically sized types, while [`deserialize_len`] is
@@ -29,13 +29,13 @@ pub trait Deserialize {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip::bytes::{Bytes, Deserialize, DeserializeError};
+    /// use rsomeip_bytes::{Bytes, Deserialize, DeserializeError};
     /// let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8]);
     /// assert_eq!(u8::deserialize(&mut buffer), Ok(1u8));
     /// assert_eq!(u8::deserialize(&mut buffer), Ok(2u8));
-    /// assert_eq!(u8::deserialize(&mut buffer), Err(DeserializeError));
+    /// assert_eq!(u8::deserialize(&mut buffer), Err(DeserializeError::InsufficientData { expected: 1, available: 0 }));
     /// ```
-    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError>;
+    fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, DeserializeError>;
 
     /// Deserializes an instance of [`Deserialize::Output`] from the buffer.
     ///
@@ -52,27 +52,27 @@ pub trait Deserialize {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip::bytes::{Bytes, Deserialize, DeserializeError, LengthField};
+    /// use rsomeip_bytes::{Bytes, Deserialize, DeserializeError, LengthField};
     ///
     /// let mut buffer = Bytes::copy_from_slice(&[2u8, 1u8, 2u8, 3u8]);
     /// let vec: Vec<u8> = Vec::deserialize_len(LengthField::U8, &mut buffer).unwrap();
     /// assert_eq!(&vec[..], &[1u8, 2u8][..]);
     ///
     /// assert_eq!(u8::deserialize(&mut buffer), Ok(3u8));
-    /// assert_eq!(u8::deserialize(&mut buffer), Err(DeserializeError));
+    /// assert_eq!(u8::deserialize(&mut buffer), Err(DeserializeError::InsufficientData { expected: 1, available: 0 }));
     /// ```
     fn deserialize_len(
         length: LengthField,
-        buffer: &mut Bytes,
+        buffer: &mut impl Buf,
     ) -> Result<Self::Output, DeserializeError> {
         let length: usize = match length {
             LengthField::U8 => u8::deserialize(buffer)?.into(),
             LengthField::U16 => u16::deserialize(buffer)?.into(),
-            LengthField::U32 => u32::deserialize(buffer)?
-                .try_into()
-                .map_err(|_| DeserializeError)?,
+            LengthField::U32 => u32::deserialize(buffer)?.try_into().map_err(|error| {
+                DeserializeError::Other(format!("invalid length field: {error}"))
+            })?,
         };
-        let mut payload = buffer.split_to(length);
+        let mut payload = buffer.take(length);
         Self::deserialize(&mut payload)
     }
 }
@@ -82,9 +82,12 @@ macro_rules! deserialize_basic_type {
         impl Deserialize for $t {
             type Output = Self;
 
-            fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+            fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, DeserializeError> {
                 if buffer.remaining() < size_of::<Self>() {
-                    return Err(DeserializeError);
+                    return Err(DeserializeError::InsufficientData {
+                        expected: size_of::<$t>(),
+                        available: buffer.remaining(),
+                    });
                 }
                 Ok(buffer.$f())
             }
@@ -106,9 +109,12 @@ deserialize_basic_type!(f64, get_f64);
 impl Deserialize for bool {
     type Output = Self;
 
-    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+    fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, DeserializeError> {
         if buffer.remaining() < size_of::<Self>() {
-            return Err(DeserializeError);
+            return Err(DeserializeError::InsufficientData {
+                expected: 1,
+                available: buffer.remaining(),
+            });
         }
         Ok((buffer.get_u8() & 0x01) == 0x01)
     }
@@ -120,7 +126,7 @@ where
 {
     type Output = Self;
 
-    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+    fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, DeserializeError> {
         Ok(std::array::from_fn(|_| {
             T::deserialize(buffer).unwrap_or_default()
         }))
@@ -133,7 +139,7 @@ where
 {
     type Output = Self;
 
-    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+    fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, DeserializeError> {
         let mut vec = vec![];
         while buffer.has_remaining() {
             vec.push(T::deserialize(buffer)?);
@@ -146,7 +152,7 @@ macro_rules! deserialize_tuple {
     ( $( $name:ident )+ ) => {
         impl<$($name: Deserialize<Output=$name>),+> Deserialize for ($($name,)+) {
             type Output = Self;
-            fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+            fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, DeserializeError> {
                 Ok((
                     $($name::deserialize(buffer)?,)+
                 ))
@@ -171,11 +177,14 @@ deserialize_tuple! { A B C D E F G H I J K L }
 impl Deserialize for String {
     type Output = Self;
 
-    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
+    fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, DeserializeError> {
         /// Deserializes an UTF-8 encoded, null terminated string.
-        fn deserialize_utf8(buffer: &mut Bytes) -> Result<String, DeserializeError> {
-            if u8::deserialize(buffer)? != 0xbf_u8 {
-                return Err(DeserializeError);
+        fn deserialize_utf8(buffer: &mut impl Buf) -> Result<String, DeserializeError> {
+            let bom = u8::deserialize(buffer)?;
+            if bom != 0xbf_u8 {
+                return Err(DeserializeError::Other(format!(
+                    "incorrect UTF-8 Byte Order Mark: 'EF BB BF' vs 'EF BB {bom:02X}'"
+                )));
             }
             let mut raw_string = Vec::<u8>::new();
             loop {
@@ -185,10 +194,14 @@ impl Deserialize for String {
                 }
                 raw_string.push(value);
             }
-            String::from_utf8(raw_string).map_err(|_| DeserializeError)
+            String::from_utf8(raw_string)
+                .map_err(|error| DeserializeError::Other(format!("invalid UTF-8 string: {error}")))
         }
         /// Deserializes an UTF-16 encoded, null terminated string.
-        fn deserialize_utf16(buffer: &mut Bytes, is_be: bool) -> Result<String, DeserializeError> {
+        fn deserialize_utf16(
+            buffer: &mut impl Buf,
+            is_be: bool,
+        ) -> Result<String, DeserializeError> {
             let mut raw_string = Vec::<u16>::new();
             loop {
                 let value = if is_be {
@@ -201,13 +214,16 @@ impl Deserialize for String {
                 }
                 raw_string.push(value);
             }
-            String::from_utf16(&raw_string).map_err(|_| DeserializeError)
+            String::from_utf16(&raw_string)
+                .map_err(|error| DeserializeError::Other(format!("invalid UTF-16 string: {error}")))
         }
-        match dbg!(u16::deserialize(buffer)?) {
+        match u16::deserialize(buffer)? {
             0xefbb => deserialize_utf8(buffer),
             0xfeff => deserialize_utf16(buffer, true),
             0xfffe => deserialize_utf16(buffer, false),
-            _ => Err(DeserializeError),
+            value => Err(DeserializeError::Other(format!(
+                "invalid Byte Order Mark: {value:04X}"
+            ))),
         }
     }
 }
@@ -215,13 +231,27 @@ impl Deserialize for String {
 impl Deserialize for Bytes {
     type Output = Self;
 
-    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, DeserializeError> {
-        Ok(buffer.split_to(buffer.remaining()))
+    fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, DeserializeError> {
+        Ok(buffer.copy_to_bytes(buffer.remaining()))
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct DeserializeError;
+/// Represents an error during the deserialization process.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum DeserializeError {
+    /// There is insufficient data in the buffer to deserialize the complete type.
+    #[error("insufficient data in buffer: {expected} vs {available}")]
+    InsufficientData {
+        /// Size of the expected data.
+        expected: usize,
+        /// Size of the available data.
+        available: usize,
+    },
+    /// Some other error has occurred.
+    #[error("{0}")]
+    Other(String),
+}
 
 #[cfg(test)]
 mod tests {
@@ -235,7 +265,13 @@ mod tests {
             fn $name() {
                 let mut buffer = Bytes::from((1 as $t).to_be_bytes().to_vec());
                 assert_eq!(<$t>::deserialize(&mut buffer), Ok(1 as $t));
-                assert_eq!(<$t>::deserialize(&mut buffer), Err(DeserializeError));
+                assert_eq!(
+                    <$t>::deserialize(&mut buffer),
+                    Err(DeserializeError::InsufficientData {
+                        expected: size_of::<$t>(),
+                        available: 0
+                    })
+                );
             }
         };
     }
@@ -256,7 +292,13 @@ mod tests {
         let mut buffer = Bytes::copy_from_slice(&[0u8, 1u8]);
         assert_eq!(bool::deserialize(&mut buffer), Ok(false));
         assert_eq!(bool::deserialize(&mut buffer), Ok(true));
-        assert_eq!(bool::deserialize(&mut buffer), Err(DeserializeError));
+        assert_eq!(
+            bool::deserialize(&mut buffer),
+            Err(DeserializeError::InsufficientData {
+                expected: 1,
+                available: 0
+            })
+        );
     }
 
     #[test]
@@ -286,14 +328,26 @@ mod tests {
         let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8, 3u8]);
         let error =
             Vec::<u16>::deserialize(&mut buffer).expect_err("should not deserialize the vec");
-        assert_eq!(error, DeserializeError);
+        assert_eq!(
+            error,
+            DeserializeError::InsufficientData {
+                expected: size_of::<u16>(),
+                available: 1
+            }
+        );
     }
 
     #[test]
     fn deserialize_tuple() {
         let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8]);
         assert_eq!(<(u8, u8)>::deserialize(&mut buffer), Ok((1u8, 2u8)));
-        assert_eq!(<(u8, u8)>::deserialize(&mut buffer), Err(DeserializeError));
+        assert_eq!(
+            <(u8, u8)>::deserialize(&mut buffer),
+            Err(DeserializeError::InsufficientData {
+                expected: size_of::<u8>(),
+                available: 0
+            })
+        );
     }
 
     #[test]

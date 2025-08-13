@@ -9,7 +9,7 @@
 //!
 //! - [`ReturnCode`] helps servers notify clients of the result of a request.
 
-use crate::bytes::{Bytes, BytesMut, Deserialize, LengthField, Serialize};
+use rsomeip_bytes::{serialize_into, size_hint, Buf, BufMut, Deserialize, LengthField, Serialize};
 
 /// Identifier of the method of a service.
 pub type MessageId = u32;
@@ -240,25 +240,40 @@ impl<T> Serialize for Message<T>
 where
     T: Serialize,
 {
-    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, crate::bytes::SerializeError> {
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, rsomeip_bytes::SerializeError> {
         let mut size = 0;
         size += self.id().serialize(buffer)?;
 
         // A length field is expected between the message id and the rest of the payload, so we
         // introduce it here by encapsulating the request and serializing it with `serialize_len`.
-        let request = |buffer: &mut BytesMut| {
-            let mut size = 0;
-            size += self.request().serialize(buffer)?;
-            size += self.protocol.serialize(buffer)?;
-            size += self.interface.serialize(buffer)?;
-            size += self.message_type.serialize(buffer)?;
-            size += self.return_code.serialize(buffer)?;
-            size += self.payload.serialize(buffer)?;
-            Ok(size)
-        };
-        size += request.serialize_len(LengthField::U32, buffer)?;
-
+        size += serialize_into!(
+            buffer,
+            length = U32,
+            self.client,
+            self.session,
+            self.protocol,
+            self.interface,
+            self.message_type,
+            self.return_code,
+            &self.payload
+        )?;
         Ok(size)
+    }
+
+    fn size_hint(&self) -> usize {
+        let mut size = 0;
+        size += size_hint!(self.service, self.method);
+        size += size_hint!(
+            length = U32,
+            self.client,
+            self.session,
+            self.protocol,
+            self.interface,
+            self.message_type,
+            self.return_code,
+            self.payload
+        );
+        size
     }
 }
 
@@ -268,7 +283,7 @@ where
 {
     type Output = Self;
 
-    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, crate::bytes::DeserializeError> {
+    fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, rsomeip_bytes::DeserializeError> {
         type Request<T> = (
             RequestId,
             ProtocolVersion,
@@ -386,15 +401,19 @@ impl From<MessageType> for u8 {
 }
 
 impl Serialize for MessageType {
-    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, crate::bytes::SerializeError> {
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, rsomeip_bytes::SerializeError> {
         u8::from(*self).serialize(buffer)
+    }
+
+    fn size_hint(&self) -> usize {
+        0u8.size_hint()
     }
 }
 
 impl Deserialize for MessageType {
     type Output = Self;
 
-    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, crate::bytes::DeserializeError> {
+    fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, rsomeip_bytes::DeserializeError> {
         Ok(Self::from(u8::deserialize(buffer)?))
     }
 }
@@ -477,15 +496,19 @@ impl From<ReturnCode> for u8 {
 }
 
 impl Serialize for ReturnCode {
-    fn serialize(&self, buffer: &mut BytesMut) -> Result<usize, crate::bytes::SerializeError> {
+    fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, rsomeip_bytes::SerializeError> {
         u8::from(*self).serialize(buffer)
+    }
+
+    fn size_hint(&self) -> usize {
+        0u8.size_hint()
     }
 }
 
 impl Deserialize for ReturnCode {
     type Output = Self;
 
-    fn deserialize(buffer: &mut Bytes) -> Result<Self::Output, crate::bytes::DeserializeError> {
+    fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, rsomeip_bytes::DeserializeError> {
         Ok(Self::from(u8::deserialize(buffer)?))
     }
 }
@@ -493,6 +516,7 @@ impl Deserialize for ReturnCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rsomeip_bytes::{Bytes, BytesMut};
 
     #[test]
     fn message_represents_data() {

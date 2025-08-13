@@ -20,7 +20,6 @@
     clippy::future_not_send
 )]
 
-pub mod bytes;
 pub mod endpoint;
 pub mod socket;
 pub mod someip;

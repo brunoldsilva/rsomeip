@@ -13,11 +13,11 @@
 
 use super::{Interface, InterfaceId, Interfaces};
 use crate::{
-    bytes::{Bytes, BytesMut, Deserialize, Serialize},
     socket::{self, RecvError, SocketAddr},
     someip::{self, Message},
     Result,
 };
+use rsomeip_bytes::{Bytes, BytesMut, Deserialize, Serialize};
 use std::rc::Rc;
 use tokio::sync::mpsc;
 
