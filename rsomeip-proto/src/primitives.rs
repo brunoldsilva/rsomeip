@@ -649,7 +649,7 @@ impl MessageTypeField {
     #[inline]
     #[must_use]
     pub const fn as_type(self) -> MessageType {
-        MessageType::from_u8(self.0)
+        MessageType::from_u8(self.0 & !Self::ALL_FLAGS)
     }
 
     /// Creates a new [`MessageTypeField`] from the given [`MessageType`].
@@ -696,7 +696,7 @@ impl MessageType {
     #[inline]
     #[must_use]
     pub const fn from_u8(value: u8) -> Self {
-        match value & !MessageTypeField::ALL_FLAGS {
+        match value {
             0x00 => Self::Request,
             0x01 => Self::RequestNoReturn,
             0x02 => Self::Notification,
@@ -967,10 +967,16 @@ mod tests {
         interface_version_is_deserializable
     );
     test_new_type_serialization!(
-        MessageTypeField,
+        MessageType,
         u8,
         message_type_is_serializable,
         message_type_is_deserializable
+    );
+    test_new_type_serialization!(
+        MessageTypeField,
+        u8,
+        message_type_field_is_serializable,
+        message_type_field_is_deserializable
     );
     test_new_type_serialization!(
         ReturnCode,
@@ -1027,18 +1033,10 @@ mod tests {
         assert_eq!(MessageType::from(0x02), MessageType::Notification);
         assert_eq!(MessageType::from(0x80), MessageType::Response);
         assert_eq!(MessageType::from(0x81), MessageType::Error);
-        assert_eq!(MessageType::from(0x20), MessageType::Request);
-        assert_eq!(MessageType::from(0x21), MessageType::RequestNoReturn);
-        assert_eq!(MessageType::from(0x22), MessageType::Notification);
-        assert_eq!(MessageType::from(0xa0), MessageType::Response);
-        assert_eq!(MessageType::from(0xa1), MessageType::Error);
         (u8::MIN..=u8::MAX)
             .filter(|x| ![0x00, 0x01, 0x02, 0x80, 0x81, 0x20, 0x21, 0x22, 0xa0, 0xa1].contains(x))
             .for_each(|x| {
-                assert_eq!(
-                    MessageType::Unknown(x & !MessageTypeField::ALL_FLAGS),
-                    MessageType::from(x)
-                );
+                assert_eq!(MessageType::Unknown(x), MessageType::from(x));
             });
     }
 

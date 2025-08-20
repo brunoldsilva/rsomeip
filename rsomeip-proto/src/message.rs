@@ -12,8 +12,18 @@ use rsomeip_bytes::{
 };
 
 /// Message addressed to a service instance.
+///
+/// This is used to identify the contents of the payload so that it can be correctly serialized.
+///
+/// Has room for a header to include additional information about the body of the message.
+///
+/// # Notes
+///
+/// This is the generic implementation. You probably want to use [`Message<T>`] instead.
+///
+/// [`Message<T>`]: crate::Message<T>
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Message<H, B> {
+pub struct GenericMessage<H, B> {
     /// Identifier of the service interface.
     pub service: ServiceId,
     /// Identifier of the method or event.
@@ -25,15 +35,15 @@ pub struct Message<H, B> {
 }
 
 // Constructor and accessors.
-impl<H, B> Message<H, B> {
-    /// Creates a new [`Message<H, B>`].
+impl<H, B> GenericMessage<H, B> {
+    /// Creates a new [`GenericMessage<H, B>`].
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::Message;
+    /// use rsomeip_proto::GenericMessage;
     ///
-    /// let message = Message::new("header", "body");
+    /// let message = GenericMessage::new("header", "body");
     /// assert_eq!(message.header, "header");
     /// assert_eq!(message.body, "body");
     /// ```
@@ -53,9 +63,9 @@ impl<H, B> Message<H, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, ServiceId, MethodId};
+    /// use rsomeip_proto::{GenericMessage, ServiceId, MethodId};
     ///
-    /// let message = Message::new("header", "body")
+    /// let message = GenericMessage::new("header", "body")
     ///     .with_service(ServiceId::new(0x1234))
     ///     .with_method(MethodId::new(0x5678));
     /// assert_eq!(message.id().as_u32(), 0x1234_5678);
@@ -71,9 +81,9 @@ impl<H, B> Message<H, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, MessageId};
+    /// use rsomeip_proto::{GenericMessage, MessageId};
     ///
-    /// let message = Message::new("header", "body").with_id(MessageId::from(0x1234_5678));
+    /// let message = GenericMessage::new("header", "body").with_id(MessageId::from(0x1234_5678));
     /// assert_eq!(message.service.as_u16(), 0x1234);
     /// assert_eq!(message.method.as_u16(), 0x5678);
     /// ```
@@ -90,9 +100,9 @@ impl<H, B> Message<H, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, ServiceId};
+    /// use rsomeip_proto::{GenericMessage, ServiceId};
     ///
-    /// let message = Message::new("header", "body").with_service(ServiceId::new(0x1234));
+    /// let message = GenericMessage::new("header", "body").with_service(ServiceId::new(0x1234));
     /// assert_eq!(message.service.as_u16(), 0x1234);
     /// ```
     #[inline]
@@ -107,9 +117,9 @@ impl<H, B> Message<H, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, MethodId};
+    /// use rsomeip_proto::{GenericMessage, MethodId};
     ///
-    /// let message = Message::new("header", "body").with_method(MethodId::new(0x1234));
+    /// let message = GenericMessage::new("header", "body").with_method(MethodId::new(0x1234));
     /// assert_eq!(message.method.as_u16(), 0x1234);
     /// ```
     #[inline]
@@ -119,109 +129,109 @@ impl<H, B> Message<H, B> {
         self
     }
 
-    /// Maps a [`Message<H, B>`] to a [`Message<T, B>`] by replacing the header of the message with
-    /// the given value.
+    /// Maps a [`GenericMessage<H, B>`] to a [`GenericMessage<T, B>`] by replacing the header of the message
+    /// with the given value.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::Message;
+    /// use rsomeip_proto::GenericMessage;
     ///
-    /// let message = Message::new("header", "body").with_header(0x1234_u16);
+    /// let message = GenericMessage::new("header", "body").with_header(0x1234_u16);
     /// assert_eq!(message.header, 0x1234_u16);
     /// ```
     #[inline]
     #[must_use]
-    pub fn with_header<T>(self, header: T) -> Message<T, B> {
-        Message::new(header, self.body)
+    pub fn with_header<T>(self, header: T) -> GenericMessage<T, B> {
+        GenericMessage::new(header, self.body)
             .with_service(self.service)
             .with_method(self.method)
     }
 
-    /// Maps a [`Message<H, B>`] to a [`Message<H, T>`] by replacing the body of the message with the
+    /// Maps a [`GenericMessage<H, B>`] to a [`GenericMessage<H, T>`] by replacing the body of the message with the
     /// given value.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::Message;
+    /// use rsomeip_proto::GenericMessage;
     ///
-    /// let message = Message::new("header", "body").with_body(0x1234_u16);
+    /// let message = GenericMessage::new("header", "body").with_body(0x1234_u16);
     /// assert_eq!(message.body, 0x1234_u16);
     /// ```
     #[inline]
     #[must_use]
-    pub fn with_body<T>(self, body: T) -> Message<H, T> {
-        Message::new(self.header, body)
+    pub fn with_body<T>(self, body: T) -> GenericMessage<H, T> {
+        GenericMessage::new(self.header, body)
             .with_service(self.service)
             .with_method(self.method)
     }
 
-    /// Maps a [`Message<H, B>`] to a [`Message<T, U>`] by applying a function to the header and body
+    /// Maps a [`GenericMessage<H, B>`] to a [`GenericMessage<T, U>`] by applying a function to the header and body
     /// of the message.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::Message;
+    /// use rsomeip_proto::GenericMessage;
     ///
-    /// let message = Message::new(1u8, 2u8)
+    /// let message = GenericMessage::new(1u8, 2u8)
     ///     .map(|header, body| (header + 1, body + 1));
     /// assert_eq!(message.header, 2);
     /// assert_eq!(message.body, 3);
     /// ```
     #[inline]
     #[must_use]
-    pub fn map<T, U, F>(self, f: F) -> Message<T, U>
+    pub fn map<T, U, F>(self, f: F) -> GenericMessage<T, U>
     where
         F: FnOnce(H, B) -> (T, U),
     {
         let (header, body) = f(self.header, self.body);
-        Message::new(header, body)
+        GenericMessage::new(header, body)
             .with_service(self.service)
             .with_method(self.method)
     }
 
-    /// Maps a [`Message<H, B>`] to a [`Message<T, B>`] by applying a function to the header of the
+    /// Maps a [`GenericMessage<H, B>`] to a [`GenericMessage<T, B>`] by applying a function to the header of the
     /// message.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::Message;
+    /// use rsomeip_proto::GenericMessage;
     ///
-    /// let message = Message::new(1u8, "body").map_header(|header| header + 1);
+    /// let message = GenericMessage::new(1u8, "body").map_header(|header| header + 1);
     /// assert_eq!(message.header, 2);
     /// ```
     #[inline]
     #[must_use]
-    pub fn map_header<T, F>(self, f: F) -> Message<T, B>
+    pub fn map_header<T, F>(self, f: F) -> GenericMessage<T, B>
     where
         F: FnOnce(H) -> T,
     {
-        Message::new(f(self.header), self.body)
+        GenericMessage::new(f(self.header), self.body)
             .with_service(self.service)
             .with_method(self.method)
     }
 
-    /// Maps a [`Message<H, B>`] to a [`Message<H, T>`] by applying a function to the body of the
+    /// Maps a [`GenericMessage<H, B>`] to a [`GenericMessage<H, T>`] by applying a function to the body of the
     /// message.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::Message;
+    /// use rsomeip_proto::GenericMessage;
     ///
-    /// let message = Message::new("header", 2u8).map_body(|body| body + 1);
+    /// let message = GenericMessage::new("header", 2u8).map_body(|body| body + 1);
     /// assert_eq!(message.body, 3);
     /// ```
     #[inline]
     #[must_use]
-    pub fn map_body<T, F>(self, f: F) -> Message<H, T>
+    pub fn map_body<T, F>(self, f: F) -> GenericMessage<H, T>
     where
         F: FnOnce(B) -> T,
     {
-        Message::new(self.header, f(self.body))
+        GenericMessage::new(self.header, f(self.body))
             .with_service(self.service)
             .with_method(self.method)
     }
@@ -233,9 +243,9 @@ impl<H, B> Message<H, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::Message;
+    /// use rsomeip_proto::GenericMessage;
     ///
-    /// let mut message = Message::new("header", "body");
+    /// let mut message = GenericMessage::new("header", "body");
     /// assert_eq!(message.replace_header("new_header"), "header");
     /// assert_eq!(message.header, "new_header");
     /// ```
@@ -252,9 +262,9 @@ impl<H, B> Message<H, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::Message;
+    /// use rsomeip_proto::GenericMessage;
     ///
-    /// let mut message = Message::new("header", "body");
+    /// let mut message = GenericMessage::new("header", "body");
     /// assert_eq!(message.replace_body("new_body"), "body");
     /// assert_eq!(message.body, "new_body");
     /// ```
@@ -266,15 +276,15 @@ impl<H, B> Message<H, B> {
 }
 
 /// Specialization for the [`Header`] type.
-impl<B> Message<Header, B> {
+impl<B> GenericMessage<Header, B> {
     /// Returns `self` as a response message with the given `return_code`.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, MessageType, ReturnCode};
+    /// use rsomeip_proto::{GenericMessage, Header, MessageType, ReturnCode};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .into_response(ReturnCode::NotOk);
     /// assert_eq!(message.header.message_type.as_type(), MessageType::Response);
     /// assert_eq!(message.header.return_code, ReturnCode::NotOk);
@@ -295,9 +305,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, MessageType, ReturnCode};
+    /// use rsomeip_proto::{GenericMessage, Header, MessageType, ReturnCode};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .into_error(ReturnCode::NotOk);
     /// assert_eq!(message.header.message_type.as_type(), MessageType::Error);
     /// assert_eq!(message.header.return_code, ReturnCode::NotOk);
@@ -318,9 +328,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, ClientId};
+    /// use rsomeip_proto::{GenericMessage, Header, ClientId};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_client(ClientId::new(0x1234));
     /// assert_eq!(message.client().as_u16(), 0x1234);
     /// ```
@@ -335,9 +345,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, ClientId};
+    /// use rsomeip_proto::{GenericMessage, Header, ClientId};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_client(ClientId::new(0x1234));
     /// assert_eq!(message.client().as_u16(), 0x1234);
     /// ```
@@ -353,9 +363,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, SessionId};
+    /// use rsomeip_proto::{GenericMessage, Header, SessionId};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_session(SessionId::new(0x1234));
     /// assert_eq!(message.session().as_u16(), 0x1234);
     /// ```
@@ -370,9 +380,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, SessionId};
+    /// use rsomeip_proto::{GenericMessage, Header, SessionId};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_session(SessionId::new(0x1234));
     /// assert_eq!(message.session().as_u16(), 0x1234);
     /// ```
@@ -388,9 +398,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, ProtocolVersion};
+    /// use rsomeip_proto::{GenericMessage, Header, ProtocolVersion};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_protocol(ProtocolVersion::new(0x12));
     /// assert_eq!(message.protocol().as_u8(), 0x12);
     /// ```
@@ -405,9 +415,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, ProtocolVersion};
+    /// use rsomeip_proto::{GenericMessage, Header, ProtocolVersion};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_protocol(ProtocolVersion::new(0x12));
     /// assert_eq!(message.protocol().as_u8(), 0x12);
     /// ```
@@ -423,9 +433,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, InterfaceVersion};
+    /// use rsomeip_proto::{GenericMessage, Header, InterfaceVersion};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_interface(InterfaceVersion::new(0x12));
     /// assert_eq!(message.interface().as_u8(), 0x12);
     /// ```
@@ -440,9 +450,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, InterfaceVersion};
+    /// use rsomeip_proto::{GenericMessage, Header, InterfaceVersion};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_interface(InterfaceVersion::new(0x12));
     /// assert_eq!(message.interface().as_u8(), 0x12);
     /// ```
@@ -453,14 +463,14 @@ impl<B> Message<Header, B> {
         self
     }
 
-    /// Returns the [`MessageType`] of this [`Message<Header, B>`].
+    /// Returns the [`MessageType`] of this [`GenericMessage<Header, B>`].
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, MessageType};
+    /// use rsomeip_proto::{GenericMessage, Header, MessageType};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_message_type(MessageType::Notification);
     /// assert_eq!(message.message_type(), MessageType::Notification);
     /// ```
@@ -475,9 +485,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, MessageType};
+    /// use rsomeip_proto::{GenericMessage, Header, MessageType};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_message_type(MessageType::Notification);
     /// assert_eq!(message.message_type(), MessageType::Notification);
     /// ```
@@ -493,9 +503,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, ReturnCode};
+    /// use rsomeip_proto::{GenericMessage, Header, ReturnCode};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_return_code(ReturnCode::E2e);
     /// assert_eq!(message.return_code(), ReturnCode::E2e);
     /// ```
@@ -510,9 +520,9 @@ impl<B> Message<Header, B> {
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, Header, ReturnCode};
+    /// use rsomeip_proto::{GenericMessage, Header, ReturnCode};
     ///
-    /// let message = Message::new(Header::new(), "body")
+    /// let message = GenericMessage::new(Header::new(), "body")
     ///     .with_return_code(ReturnCode::E2e);
     /// assert_eq!(message.return_code(), ReturnCode::E2e);
     /// ```
@@ -524,7 +534,7 @@ impl<B> Message<Header, B> {
     }
 }
 
-impl<H, B> Serialize for Message<H, B>
+impl<H, B> Serialize for GenericMessage<H, B>
 where
     H: Serialize,
     B: Serialize,
@@ -544,7 +554,7 @@ where
     }
 }
 
-impl<H, B> Deserialize for Message<H, B>
+impl<H, B> Deserialize for GenericMessage<H, B>
 where
     H: Deserialize<Output = H>,
     B: Deserialize<Output = B>,
@@ -563,37 +573,33 @@ where
     }
 }
 
-#[cfg(test)]
-impl<H, B> Message<H, B>
+impl<H, B> GenericMessage<H, B>
 where
     H: Serialize + Deserialize<Output = H>,
     B: Serialize + Deserialize<Output = B>,
 {
-    /// Returns a [`Bytes`] buffer containing the serialized message.
+    /// Returns a buffer containing the serialized message.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the serialization fails.
-    #[must_use]
-    pub fn to_bytes(&self) -> rsomeip_bytes::Bytes {
+    /// Returns a [`SerializeError`] if the message could not be serialized.
+    pub fn to_bytes(&self) -> Result<rsomeip_bytes::Bytes, rsomeip_bytes::SerializeError> {
         let mut buffer = rsomeip_bytes::BytesMut::new();
-        self.serialize(&mut buffer)
-            .expect("should serialize the message");
-        buffer.freeze()
+        self.serialize(&mut buffer)?;
+        Ok(buffer.freeze())
     }
 
-    /// Returns a [`Message<H, B>`] deserialized from the `buffer`.
+    /// Returns a [`GenericMessage<H, B>`] deserialized from the `buffer`.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the deserialization fails.
-    #[must_use]
-    pub fn from_bytes(buffer: &mut impl Buf) -> Self {
-        Self::deserialize(buffer).expect("should deserialize the message")
+    /// Returns a [`DeserializeError`] if the message could not be deserialized.
+    pub fn from_bytes(buffer: &mut impl Buf) -> Result<Self, rsomeip_bytes::DeserializeError> {
+        Self::deserialize(buffer)
     }
 }
 
-impl<H, B> Default for Message<H, B>
+impl<H, B> Default for GenericMessage<H, B>
 where
     H: Default,
     B: Default,
@@ -608,7 +614,7 @@ where
     }
 }
 
-impl<H, B> std::fmt::Display for Message<H, B>
+impl<H, B> std::fmt::Display for GenericMessage<H, B>
 where
     H: std::fmt::Display,
 {
@@ -617,9 +623,9 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// use rsomeip_proto::{Message, ServiceId, MethodId};
+    /// use rsomeip_proto::{GenericMessage, ServiceId, MethodId};
     ///
-    /// let message = Message::new("header", "body")
+    /// let message = GenericMessage::new("header", "body")
     ///     .with_service(ServiceId::new(0x1234))
     ///     .with_method(MethodId::new(0x5678));
     /// assert_eq!(message.to_string(), "1234.5678.header")
@@ -627,29 +633,6 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}.{}.{}", self.service, self.method, self.header)
     }
-}
-
-/// A message processing error.
-///
-/// A SOME/IP endpoint may occasionally try to send or receive messages which are incorrectly
-/// configured for the service interface that processes them.
-///
-/// This enum serves as a way to represent the reason for a message to not be processed, as well as
-/// whether the error should be reported to the user or not.
-///
-/// # Error Handling
-///
-/// Depending on the error variant, either an error response should be sent back to the source or the
-/// whole message should be dropped.
-///
-/// If the error is [`MessageError::Invalid`], then an error response should be sent with the
-/// contained [`ReturnCode`]. Otherwise, the message should be dropped.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-pub enum MessageError {
-    #[error("invalid message: {0}")]
-    Invalid(ReturnCode),
-    #[error("message dropped: {0}")]
-    Dropped(ReturnCode),
 }
 
 /// Header of a SOME/IP message.
@@ -904,7 +887,7 @@ mod tests {
     use super::*;
     use rsomeip_bytes::{Bytes, BytesMut};
 
-    const DESERIALIZED_MESSAGE: Message<u8, u8> = Message::new(1u8, 2u8)
+    const DESERIALIZED_MESSAGE: GenericMessage<u8, u8> = GenericMessage::new(1u8, 2u8)
         .with_service(ServiceId::new(0x1234_u16))
         .with_method(MethodId::new(0x5678_u16));
 
@@ -930,8 +913,8 @@ mod tests {
     #[test]
     fn message_is_deserializable() {
         let mut buffer = Bytes::copy_from_slice(&SERIALIZED_MESSAGE[..]);
-        let message =
-            Message::<u8, u8>::deserialize(&mut buffer).expect("should deserialize the message");
+        let message = GenericMessage::<u8, u8>::deserialize(&mut buffer)
+            .expect("should deserialize the message");
         assert_eq!(message, DESERIALIZED_MESSAGE);
     }
 
