@@ -7,7 +7,7 @@ use crate::{
     ProtocolVersion, RequestId, ReturnCode, ServiceId, SessionId,
 };
 use rsomeip_bytes::{
-    Buf, BufMut, Deserialize, DeserializeError, Serialize, SerializeError, deserialize_from,
+    Buf, BufMut, Bytes, Deserialize, DeserializeError, Serialize, SerializeError, deserialize_from,
     serialize_into, size_hint,
 };
 
@@ -583,7 +583,7 @@ where
     /// # Errors
     ///
     /// Returns a [`SerializeError`] if the message could not be serialized.
-    pub fn to_bytes(&self) -> Result<rsomeip_bytes::Bytes, rsomeip_bytes::SerializeError> {
+    pub fn to_bytes(&self) -> Result<Bytes, SerializeError> {
         let mut buffer = rsomeip_bytes::BytesMut::new();
         self.serialize(&mut buffer)?;
         Ok(buffer.freeze())
@@ -594,7 +594,7 @@ where
     /// # Errors
     ///
     /// Returns a [`DeserializeError`] if the message could not be deserialized.
-    pub fn from_bytes(buffer: &mut impl Buf) -> Result<Self, rsomeip_bytes::DeserializeError> {
+    pub fn from_bytes(buffer: &mut impl Buf) -> Result<Self, DeserializeError> {
         Self::deserialize(buffer)
     }
 }
@@ -885,7 +885,7 @@ impl std::fmt::Display for Header {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rsomeip_bytes::{Bytes, BytesMut};
+    use rsomeip_bytes::BytesMut;
 
     const DESERIALIZED_MESSAGE: GenericMessage<u8, u8> = GenericMessage::new(1u8, 2u8)
         .with_service(ServiceId::new(0x1234_u16))

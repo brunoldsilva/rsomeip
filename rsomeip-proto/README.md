@@ -10,6 +10,11 @@ focused on message processing.
 It provides the basic primitives used by the protocol as well as endpoint and
 interface abstractions to check messages for correctness.
 
+## Features
+
+- **tp**: Implementation of the SOME/IP Transport Protocol for segmenting large
+  messages.
+
 ## Getting Started
 
 1. Add `rsomeip-proto` as a dependency to your project.

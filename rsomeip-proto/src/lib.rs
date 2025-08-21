@@ -22,3 +22,6 @@ pub use endpoint::{Endpoint, EndpointError};
 
 pub(crate) mod interface;
 pub use interface::{Interface, InterfaceType, MethodType};
+
+#[cfg(feature = "tp")]
+pub mod tp;

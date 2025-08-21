@@ -20,5 +20,8 @@ repository.workspace = true
 rsomeip-bytes = { path = "../rsomeip-bytes", version = "0.1.0" }
 thiserror = "2.0.14"
 
+[features]
+tp = []
+
 [lints]
 workspace = true
