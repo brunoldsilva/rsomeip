@@ -2,7 +2,7 @@
 # More info: <https://doc.rust-lang.org/cargo/reference/workspaces.html>
 
 [workspace]
-members = ["rsomeip", "rsomeip-bytes"]
+members = ["rsomeip", "rsomeip-bytes", "rsomeip-proto"]
 resolver = "2"
 
 [workspace.package]

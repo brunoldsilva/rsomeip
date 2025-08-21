@@ -1,0 +1,27 @@
+# rsomeip-proto cargo manifest.
+# More info: <https://doc.rust-lang.org/cargo/reference/manifest.html>
+
+[package]
+name = "rsomeip-proto"
+version = "0.1.0"
+description = "Sans-IO implementation of the SOME/IP protocol."
+documentation = "https://docs.rs/rsomeip-proto"
+readme = "README.md"
+keywords = ["someip", "sans-io"]
+categories = ["automotive", "network-programming"]
+
+# Inherited from workspace.
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rsomeip-bytes = { path = "../rsomeip-bytes", version = "0.1.0" }
+thiserror = "2.0.14"
+
+[features]
+tp = []
+
+[lints]
+workspace = true
