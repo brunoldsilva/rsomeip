@@ -23,7 +23,10 @@
 
 # Dev Container configuration.
 !.devcontainer/
-!.devcontainer.json
+!.devcontainer/devcontainer.json
+!.devcontainer/Dockerfile
+!.devcontainer/install-homebrew.sh
+!.devcontainer/install-rust.sh
 
 # GitHub configuration.
 !.github/
