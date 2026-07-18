@@ -2,7 +2,7 @@
 ///
 /// An optional `length` parameter can be specified to serialize the variables using [`serialize_len`].
 ///
-/// # Performance Considerations
+/// # Performance considerations
 ///
 /// This macro is provided simply as a convenience for implementing the [`Serialize`] trait.
 ///
@@ -84,11 +84,11 @@ macro_rules! size_hint {
 /// An optional `length` parameter can be specified to deserialize the variables using
 /// [`deserialize_len`].
 ///
-/// # Performance Considerations
+/// # Performance considerations
 ///
 /// This macro is provided simply as a convenience for implementing the [`Deserialize`] trait.
 ///
-/// It uses tuples to deserialize the variables from the buffer, which may not be the most performant
+/// It uses tuples to deserialize the variables from the buffer, which may not be the most best
 /// solution for every use case, but is one that works well in most situations.
 ///
 /// # Examples

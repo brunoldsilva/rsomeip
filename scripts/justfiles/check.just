@@ -29,3 +29,10 @@ shellscript:
     find . -type f -name '*.sh' -print0 | xargs -0 shellcheck
 
 alias sh := shellscript
+
+# Perform static analysis of documentation files.
+docs:
+    # Check Markdown files.
+    markdownlint --ignore-path .gitignore .
+    # Check prose in documentation.
+    vale --glob '{rsomeip*/{{{{src,examples}/*.rs,*.md},docs/**/*.md,*.md}' .

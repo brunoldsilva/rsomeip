@@ -1,5 +1,4 @@
-//! A Rust implementation of AUTOSTAR's [Scalable service-Oriented MiddlewarE over IP
-//! (SOME/IP)](https://some-ip.com/).
+//! A Rust implementation of the [Scalable service-Oriented MiddlewarE over IP (SOME/IP)](https://some-ip.com/).
 //!
 //! ## Overview
 //!

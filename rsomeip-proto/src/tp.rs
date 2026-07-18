@@ -45,7 +45,7 @@ impl TpHeader {
     ///
     /// Returns [`None`] if the body is already below the limit.
     ///
-    /// The `limit` must be a multiple of 16. If not, it will be rounded to the nearest multiple less
+    /// The `limit` must be a multiple of 16. If not, it's rounded to the nearest multiple less
     /// than the `limit`.
     ///
     /// # Examples
@@ -88,7 +88,7 @@ impl TpHeader {
         // Round the limit to the nearest multiple of 16.
         let limit = limit / Self::OFFSET_UNIT * Self::OFFSET_UNIT;
 
-        // Check if we are already below the limit.
+        // Check if already below the limit.
         if self.body.len() <= limit {
             self.more_segments = false;
             return None;
@@ -101,7 +101,7 @@ impl TpHeader {
             body: self.body.split_to(limit),
         };
 
-        // Update our offset.
+        // Update the offset.
         self.offset += limit / Self::OFFSET_UNIT;
 
         // Return the new segment.
@@ -147,12 +147,12 @@ impl TpHeader {
     /// );
     /// ```
     pub fn join(&mut self, other: Self) -> Result<(), TpError> {
-        // Check if we are expecting other segments.
+        // Check if expecting other segments.
         if !self.more_segments {
             return Err(TpError::UnexpectedSegment(other));
         }
 
-        // Get our current offset.
+        // Get the current offset.
         let current_offset = self.body.len() / Self::OFFSET_UNIT;
 
         // Check if the other header's offset is correct.

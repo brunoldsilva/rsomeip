@@ -244,7 +244,7 @@ where
         let mut size = 0;
         size += self.id().serialize(buffer)?;
 
-        // A length field is expected between the message id and the rest of the payload, so we
+        // A length field is expected between the message id and the rest of the payload, so
         // introduce it here by encapsulating the request and serializing it with `serialize_len`.
         size += serialize_into!(
             buffer,
@@ -294,7 +294,7 @@ where
         );
         let id = MessageId::deserialize(buffer)?;
 
-        // A length field is expected here which we must account for when deserializing the request.
+        // A length field is expected here which must account for when deserializing the request.
         let (request, protocol, interface, message_type, return_code, payload) =
             Request::<T>::deserialize_len(LengthField::U32, buffer)?;
 

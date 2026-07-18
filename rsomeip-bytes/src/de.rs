@@ -16,14 +16,14 @@ use super::{Buf, Bytes, LengthField};
 /// [`deserialize`]: Deserialize::deserialize
 /// [`deserialize_len`]: Deserialize::deserialize_len
 pub trait Deserialize {
-    /// Type of the data that will be deserialized.
+    /// Type of the deserialized data.
     type Output: Sized;
 
     /// Deserializes an instance of [`Deserialize::Output`] from the buffer.
     ///
     /// # Errors
     ///
-    /// This function will return an error if the deserialization process fails for any reason,
+    /// This function returns an error if the deserialization process fails for any reason,
     /// such as encountering unexpected data or running out of data in the buffer.
     ///
     /// # Examples
@@ -45,7 +45,7 @@ pub trait Deserialize {
     ///
     /// # Errors
     ///
-    /// This function will return an error if the deserialization process fails for any reason,
+    /// This function returns an error if the deserialization process fails for any reason,
     /// such as encountering unexpected data, running out of data in the buffer, or exceeding the
     /// specified length.
     ///

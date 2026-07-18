@@ -56,6 +56,18 @@
 !docs/**/
 !docs/**/*.md
 
+# Vale linter configuration.
+!.vale.ini
+!.config/vale/
+!.config/vale/styles/
+!.config/vale/styles/config/
+!.config/vale/styles/config/vocabularies/
+!.config/vale/styles/config/vocabularies/rsomeip/
+!.config/vale/styles/config/vocabularies/rsomeip/accept.txt
+
+# Markdownlint configuration.
+!.markdownlint.yml
+
 # cargo-deny and cargo-vet configurations.
 !deny.toml
 !.config/

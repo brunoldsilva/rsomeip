@@ -12,10 +12,10 @@ pub(crate) use port;
 ///
 /// This macro has three versions:
 ///
-/// - `ipv4!([127, 0, 0, 1], 12345)` will create the address `127.0.0.1:12345`.
-/// - `ipv4!([127, 0, 0, 1])` will create the address `127.0.0.1` with a random port in the range
+/// - `ipv4!([127, 0, 0, 1], 12345)` creates the address `127.0.0.1:12345`.
+/// - `ipv4!([127, 0, 0, 1])` creates the address `127.0.0.1` with a random port in the range
 ///   `49_152..65_535`.
-/// - `ipv4!()` will create a random address in the range `127.0.0.1-127.0.0.255` with a random
+/// - `ipv4!()` creates a random address in the range `127.0.0.1-127.0.0.255` with a random
 ///    port in the range `49_152..65_535`.
 macro_rules! ipv4 {
     ([$($addr:tt),*], $port:tt) => {

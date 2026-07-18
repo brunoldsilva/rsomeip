@@ -11,7 +11,7 @@ It also provides implementation of said traits for all basic types supported by
 the protocol, as well as for some commonly used types from Rust's standard
 library.
 
-## Getting Started
+## Getting started
 
 1. Add `rsomeip-bytes` as a dependency to your project.
 
