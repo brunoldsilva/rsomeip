@@ -1,0 +1,8 @@
+# Configuration file for markdownlint.
+# More info: <https://github.com/markdownlint/markdownlint/blob/main/docs/RULES.md>
+
+# Increase threshold for maximum line length.
+MD013:
+    code_block_line_length: 120
+    line_length: 100
+    tables: false

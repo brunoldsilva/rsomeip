@@ -12,7 +12,7 @@
 //! [`Stub`]: crate::endpoint::Stub
 //! [`Proxy`]: crate::endpoint::Proxy
 
-use crate::{endpoint::InterfaceId, socket::SocketAddr, someip, Result};
+use crate::{Result, endpoint::InterfaceId, socket::SocketAddr, someip};
 use rsomeip_bytes::Bytes;
 use std::rc::Rc;
 use tokio::sync::mpsc;

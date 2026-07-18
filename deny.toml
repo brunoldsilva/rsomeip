@@ -1,0 +1,29 @@
+# cargo-deny configuration.
+# More info: <https://embarkstudios.github.io/cargo-deny/index.html>
+
+[graph]
+# Scan all features by default.
+all-features = true
+
+# Check for issues in an advisory database.
+[advisories]
+# Limit unmaintained advisories to direct dependencies of this workspace.
+unmaintained = "workspace"
+
+# Check for incompatible licenses.
+[licenses]
+# Explicitly allow compatible licenses.
+allow = [
+    "MIT",
+    "Apache-2.0",
+]
+# Exceptions on a per-crate basis.
+exceptions = [
+    # Used by the `syn` crate.
+    { allow = ["Unicode-3.0"], crate = "unicode-ident" },
+]
+
+# Check for banned or duplicated dependencies.
+[bans]
+# Ban duplicate or unused dependencies in this workspace.
+workspace-dependencies = { duplicates = "deny", unused = "deny", include-path-dependencies = false }

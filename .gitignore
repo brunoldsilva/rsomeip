@@ -1,14 +1,76 @@
 # File patterns to exclude from version control.
+# More info: https://git-scm.com/docs/gitignore
 
-# Hidden files.
-_*
+# Exclude all files by default.
+*
 
-# Cargo generated artifacts.
-target/
-Cargo.lock
+# File patterns to explicitly include in version control.
 
-# Visual Studio Code configuration files, except tasks and code snippets.
-.vscode/*
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/*.code-snippets
+# gitignore itself.
+!.gitignore
+
+# Cargo project configuration.
+!Cargo.lock
+!Cargo.toml
+
+# Rust source code.
+!rsomeip*/
+!rsomeip*/src/
+!rsomeip*/src/**/
+!rsomeip*/examples/
+!rsomeip*/examples/**/
+!rsomeip*/**/*.rs
+
+# Clippy configuration.
+!clippy.toml
+
+# Dev Container configuration.
+!.devcontainer/
+!.devcontainer/devcontainer.json
+!.devcontainer/Dockerfile
+!.devcontainer/install-homebrew.sh
+!.devcontainer/install-rust.sh
+
+# Just configuration.
+!justfile
+!scripts/
+!scripts/justfiles/
+!scripts/**/*.just
+
+# GitHub configuration.
+!.github/
+!.github/**/
+!.github/**/*.yml
+
+# Project governance.
+!ARCHITECTURE.md
+!CHANGELOG.md
+!CODE_OF_CONDUCT.md
+!LICENSE-APACHE
+!LICENSE-MIT
+!README.md
+!SECURITY.md
+
+# Documentation.
+!docs/
+!docs/**/
+!docs/**/*.md
+
+# Vale linter configuration.
+!.vale.ini
+!.config/vale/
+!.config/vale/styles/
+!.config/vale/styles/config/
+!.config/vale/styles/config/vocabularies/
+!.config/vale/styles/config/vocabularies/rsomeip/
+!.config/vale/styles/config/vocabularies/rsomeip/accept.txt
+
+# Markdownlint configuration.
+!.markdownlint.yml
+
+# cargo-deny and cargo-vet configurations.
+!deny.toml
+!.config/
+!.config/supply-chain/
+!.config/supply-chain/*.toml
+!.config/supply-chain/*.lock

@@ -1,19 +1,102 @@
-# rsomeip cargo workspace manifest.
+# Configuration file for Cargo workspaces.
 # More info: <https://doc.rust-lang.org/cargo/reference/workspaces.html>
 
 [workspace]
 members = ["rsomeip", "rsomeip-bytes", "rsomeip-proto"]
-resolver = "2"
+resolver = "3"
 
+# Properties inherited by packages in this workspace.
 [workspace.package]
 authors = ["Bruno Silva <brunoldsilva@pm.me>"]
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/brunoldsilva/rsomeip"
+categories = ["automotive", "network-programming"]
 
+# Dependencies inherited by packages in this workspace.
+[workspace.dependencies]
+# Serialization according to the SOME/IP on-wire format.
+rsomeip-bytes = { path = "./rsomeip-bytes", version = "0.1.0" }
+# Types and trais for working with bytes.
+bytes = "1.10.1"
+# Random number generators.
+rand = "0.8.5"
+# High-performance concurrent containers.
+scc = "3.8.4"
+# Used to specify error types in library code.
+thiserror = "2.0.14"
+# Event-driven, non-blocking IO asynchronous runtime.
+tokio = "1.29.1"
+# Additional utilities for working with tokio.
+tokio-util = "0.7.10"
+# Testing utilities for tokio.
+tokio-test = "0.4.3"
+
+# Lints inherited by packages in this workspace.
+[workspace.lints.rust]
+# Document all public items.
+missing_docs = "warn"
+
+# Lints inherited by packages in this workspace.
 [workspace.lints.clippy]
-nursery = { level = "warn", priority = -1 }  # Makes clippy even more pedantic.
-pedantic = { level = "warn", priority = -1 } # Helps identify simple improvements.
-unwrap_used = "warn"                         # Prefer error handling/propagation instead of panics.
-expect_used = "warn"                         # Same as unwrap, but can be used in tests.
-module_name_repetitions = "allow"            # Module name repetitions are fine.
+# Cargo configurations lints.
+cargo = { level = "warn", priority = -1 }
+# Generates a lot of conflicts with dependencies.
+multiple_crate_versions = "allow"
+# Experimental lints.
+nursery = { level = "warn", priority = -1 }
+# Pedantic, but generally useful lints.
+pedantic = { level = "warn", priority = -1 }
+# Heavily restrictive lints. See exceptions below.
+restriction = { level = "warn", priority = -1 }
+# Alphabetical ordering is undesirable.
+arbitrary_source_item_ordering = "allow"
+# Usage of the restriction lint group is intentional.
+blanket_clippy_restriction_lints = "allow"
+# Used to test at module crate boundaries.
+cfg_not_test = "allow"
+# Having exhaustive enums is OK.
+exhaustive_enums = "allow"
+# Having exhaustive structs is OK.
+exhaustive_structs = "allow"
+# Preferred method of returning a value.
+implicit_return = "allow"
+# Preferred method of defining generic parameters.
+impl_trait_in_params = "allow"
+# Each case needs careful consideration.
+missing_inline_in_public_items = "allow"
+# Unnecessary in most cases.
+missing_trait_methods = "allow"
+# Preferred method of returning early on error.
+question_mark_used = "allow"
+# Works well with `pattern_type_mismatch = warn`.
+ref_patterns = "allow"
+# Preferred method of naming modules.
+self_named_module_files = "allow"
+# Prefer `1234_u16` over `1234u16`.
+separated_literal_suffix = "allow"
+# Idiomatic.
+shadow_reuse = "allow"
+# Used to encapsulate logic at the correct level of abstraction.
+single_call_fn = "allow"
+# Not targeting no_std environments.
+std_instead_of_alloc = "allow"
+# Not targeting no_std environments.
+std_instead_of_core = "allow"
+
+# Optimize the release profile for runtime performance.
+[profile.release]
+codegen-units = 1
+debug = false
+lto = true
+panic = "abort"
+
+# Optimized release profile with added instrumentation.
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = "none"
+
+[workspace.metadata.vet]
+# Configure data store for cargo-vet.
+store = { path = "./.config/supply-chain" }

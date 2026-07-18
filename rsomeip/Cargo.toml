@@ -1,24 +1,39 @@
+# rsomeip-proto cargo manifest.
+# More info: <https://doc.rust-lang.org/cargo/reference/manifest.html>
+
 [package]
 name = "rsomeip"
 version = "0.1.0"
-edition = "2021"
-license = "MIT OR Apache-2.0"
-description = "A Rust implementation of AUTOSTAR's Scalable service-Oriented MiddlewarE over IP (SOME/IP)."
+description = "A Rust implementation of the Scalable service-Oriented MiddlewarE over IP (SOME/IP)."
+documentation = "https://docs.rs/rsomeip"
+readme = "README.md"
+keywords = ["someip"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# Inherited from workspace.
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
-rsomeip-bytes = { path = "../rsomeip-bytes", version = "0.1.0" }
-scc = "2.2.5"
-tokio = { version = "1.29.1", features = [
+# Serialization according to the SOME/IP on-wire format.
+rsomeip-bytes.workspace = true
+# High-performance concurrent containers.
+scc.workspace = true
+# Event-driven, non-blocking IO asynchronous runtime.
+tokio = { workspace = true, features = [
+    "macros",
     "net",
     "rt",
     "sync",
-    "macros",
     "time",
-] }
-tokio-util = "0.7.10"
+]}
+# Additional utilities for working with tokio.
+tokio-util.workspace = true
 
 [dev-dependencies]
-rand = "0.8.5"
-tokio-test = "0.4.3"
+# Random number generators.
+rand.workspace = true
+# Testing utilities for tokio.
+tokio-test.workspace = true

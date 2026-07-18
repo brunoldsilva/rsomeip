@@ -22,7 +22,7 @@ pub trait Serialize {
     ///
     /// # Errors
     ///
-    /// This function will return an error if serialization fails for any reason, such as the
+    /// This function returns an error if serialization fails for any reason, such as the
     /// buffer not having enough space.
     ///
     /// # Examples
@@ -45,7 +45,7 @@ pub trait Serialize {
     ///
     /// # Errors
     ///
-    /// This function will return an error if serialization fails for any reason, such as the
+    /// This function returns an error if serialization fails for any reason, such as the
     /// buffer not having enough space, or the length of the serialized data exceeding the capacity
     /// of the length field.
     ///
@@ -268,7 +268,7 @@ pub trait SerializeString {
     ///
     /// # Errors
     ///
-    /// This function will return an error if serialization fails for any reason, such as the
+    /// This function returns an error if serialization fails for any reason, such as the
     /// buffer not having enough space, or the length of the serialized data exceeding the capacity
     /// of the length field.
     ///
@@ -299,7 +299,7 @@ pub trait SerializeString {
     ///
     /// # Errors
     ///
-    /// This function will return an error if serialization fails for any reason, such as the
+    /// This function returns an error if serialization fails for any reason, such as the
     /// buffer not having enough space, or the length of the serialized data exceeding the capacity
     /// of the length field.
     ///
@@ -330,7 +330,7 @@ pub trait SerializeString {
     ///
     /// # Errors
     ///
-    /// This function will return an error if serialization fails for any reason, such as the
+    /// This function returns an error if serialization fails for any reason, such as the
     /// buffer not having enough space, or the length of the serialized data exceeding the capacity
     /// of the length field.
     ///
@@ -556,16 +556,16 @@ mod tests {
 
     #[test]
     fn serialize_utf8() {
-        let mut buffer = BytesMut::with_capacity(10);
-        let size = "Hello!"
+        let mut buffer = BytesMut::with_capacity(9);
+        let size = "Hello"
             .serialize_utf8(&mut buffer, None)
             .expect("should serialize the string");
-        assert_eq!(size, 10);
+        assert_eq!(size, 9);
         assert_eq!(
             &buffer.freeze()[..],
             [
                 0xef_u8, 0xbb, 0xbf, // UTF-8 Byte Order Mark
-                0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x21, // Hello!
+                0x48, 0x65, 0x6c, 0x6c, 0x6f, // Hello
                 0x00  // Delimiter
             ]
         );

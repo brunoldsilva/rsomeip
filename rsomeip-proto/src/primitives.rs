@@ -1,10 +1,10 @@
 //! SOME/IP primitive types.
 //!
-//! This module provides strongly-typed definitions for the primitives used by the SOME/IP protocol.
+//! This module provides strongly typed definitions for the primitives used by the SOME/IP protocol.
 
 use rsomeip_bytes::{Buf, BufMut, Deserialize, DeserializeError, Serialize, SerializeError};
 
-/// Implements basic functionality for new-types that wrap a single primitive.
+/// Implements basic capabilities for new-types that wrap a single primitive.
 ///
 /// Includes const (`new` and `as_`) and non-const (`from` and `into`) methods for converting between
 /// the new-type and its internal representation, and implements [`Serialize`], [`Deserialize`] and
@@ -106,12 +106,12 @@ pub struct ServiceId(u16);
 
 impl_basic_type_u16!(ServiceId);
 
-/// Unique identifier of a method, field or event on a service interface.
+/// Unique identifier of a method, field, or event on a service interface.
 ///
-/// A method is a callable function, procedure or subroutine which can be invoked by consumers of a
+/// A method is a callable function, procedure, or subroutine which can be invoked by consumers of a
 /// service.
 ///
-/// A field represents a status or valid value on which getters, setters and notifiers act upon.
+/// A field represents a status or valid value on which getters, setters, and notifiers act upon.
 ///
 /// An event is a uni-directional data transmission that is invoked on changes or cyclically and
 /// is sent to consumers of a service.
@@ -327,14 +327,14 @@ impl ClientId {
 ///
 /// Used to differentiate messages to the same method or event.
 ///
-/// # Session Handling
+/// # Session handling
 ///
 /// When session handling is active (`0x0001-0xffff`), the session ID should be
 /// incremented according to the respective use case.
 ///
 /// After reaching `0xffff`, the session ID should wrap back around to `1`.
 ///
-/// ## Request/Response
+/// ## Request/response
 ///
 /// Each new request should increment the ID by `1` and each response should copy over
 /// the same ID from the request.
@@ -348,10 +348,10 @@ pub struct SessionId(u16);
 impl_basic_type_u16!(SessionId);
 
 impl SessionId {
-    /// Default value when session handling is disabled.
+    /// Default value when session handling is off.
     pub const DISABLED: Self = Self::new(0);
 
-    /// Default value when session handling is enabled.
+    /// Default value when session handling is on.
     pub const ENABLED: Self = Self::new(1);
 
     /// Whether session handling is enabled.

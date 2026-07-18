@@ -1,0 +1,22 @@
+([Dd]es|[Ss])erializ(ation|e[ds]?|ing)
+([Mm]ult|[Uu]n)icast
+(tp|TP)
+[Aa]ccessors?
+[Aa]pplications?
+[Aa]sync
+[Dd]atagrams?
+[Ee]ndian
+[GgSs]etters?
+[Mm]iddlewar[Ee]
+[Mm]utex
+AUTOSAR
+connectionless
+const
+enum
+impl
+rsomeip
+runtime
+Tokio
+Transmission Control Protocol
+User Datagram Protocol
+licensed as above

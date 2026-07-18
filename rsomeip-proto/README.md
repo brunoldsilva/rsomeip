@@ -15,7 +15,7 @@ interface abstractions to check messages for correctness.
 - **tp**: Implementation of the SOME/IP Transport Protocol for segmenting large
   messages.
 
-## Getting Started
+## Getting started
 
 1. Add `rsomeip-proto` as a dependency to your project.
 

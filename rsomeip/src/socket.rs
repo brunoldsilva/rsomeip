@@ -7,14 +7,14 @@
 //! between sockets, and [`Sender`] and [`Receiver`], which allow sending and receiving data
 //! between the sockets.
 //!
-//! # Transmission Control Protocol.
+//! # Transmission Control Protocol
 //!
 //! TCP is a connection-oriented, reliable, ordered, and error-checked communication protocol of
 //! the Internet Protocol suite.
 //!
 //! A basic socket implementation of this protocol is provided by the [`tcp`] module.
 //!
-//! # User Datagram Protocol (UDP)
+//! # User Datagram Protocol
 //!
 //! UDP is a connection-less, datagram-based communication protocol of the Internet Protocol suite
 //! designed for speed and efficiency.
@@ -68,15 +68,15 @@ pub trait Connector {
     ///
     /// ## Stream
     ///
-    /// A call to `connect` will attempt to create a stream between this connector and the
-    /// listener at the given address. If the stream is accepted by the listener, the method will
-    /// return a [`Sender`] and [`Receiver`] bound to the other socket.
+    /// A call to `connect` attempts to create a stream between this connector and the
+    /// listener at the given address. If the stream is accepted by the listener, the method
+    /// returns a [`Sender`] and [`Receiver`] bound to the other socket.
     ///
     /// ## Datagram
     ///
-    /// A call to `connect` will return a [`Sender`] and [`Receiver`] bound to the given address,
+    /// A call to `connect` returns a [`Sender`] and [`Receiver`] bound to the given address,
     /// without establishing any underlying stream between the two sockets. This means that the
-    /// other socket will only become aware of this socket once some data is sent to it.
+    /// other socket only becomes aware of this socket once some data is sent to it.
     #[allow(async_fn_in_trait)]
     async fn connect(&mut self, address: &SocketAddr) -> IoResult<(Self::Sender, Self::Receiver)>;
 
@@ -84,7 +84,7 @@ pub trait Connector {
     ///
     /// `backlog` defines the maximum number of pending connections which can be queued at any
     /// given time. Connection are removed from the queue with [`Listener::accept`]. When the queue
-    /// is full, new connections will be rejected.
+    /// is full, new connections are be rejected.
     ///
     /// # Errors
     ///
@@ -103,7 +103,7 @@ pub trait Sender {
     /// Returns an error if the data could not be sent, either because there is a problem with the
     /// connection, or with the data itself.
     ///
-    /// # Buffer Size
+    /// # Buffer size
     ///
     /// Datagram based protocols may impose a maximum payload size. If the buffer is larger than
     /// the maximum size, the payload may be split or the operation may fail, depending on the
@@ -133,9 +133,9 @@ pub trait Receiver {
 /// Represents an error when receiving data from a [`Receiver`].
 #[derive(Debug)]
 pub enum RecvError {
-    /// The receiver is closed and will not receive any more data.
+    /// The receiver is closed and won't receive any more data.
     Closed,
-    /// The receiver lagged too far behind. Attempting to receive again will return the oldest
+    /// The receiver lagged too far behind. Attempting to receive again returns the oldest
     /// message still retained by the channel.
     Lagged(u64),
 }
@@ -157,7 +157,7 @@ pub enum RecvError {
 /// # Datagram
 ///
 /// Datagram based listeners detect connections based on the source address of incoming packets.
-/// When accepting a connection, the received datagram will already be present in the [`Receiver`].
+/// When accepting a connection, the received datagram is already present in the [`Receiver`].
 pub trait Listener {
     /// Type of the connection's sender half.
     type Sender: Sender + 'static;

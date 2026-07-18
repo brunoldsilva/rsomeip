@@ -15,7 +15,7 @@
 //!
 //! - [`v1`] is a concrete implementation of Version 1 of the SOME/IP protocol.
 
-use crate::{socket::SocketAddr, someip, Result};
+use crate::{Result, socket::SocketAddr, someip};
 use rsomeip_bytes::Bytes;
 
 pub mod v1;
@@ -33,7 +33,7 @@ pub trait Server {
 
     /// Serves the given service on this endpoint.
     ///
-    /// SOME/IP messages with matching id and interface version will be forwarded to the service.
+    /// SOME/IP messages with matching id and interface version are be forwarded to the service.
     ///
     /// # Errors
     ///
@@ -43,7 +43,7 @@ pub trait Server {
 
     /// Serves the given service on this endpoint.
     ///
-    /// SOME/IP messages with matching id and interface version will be forwarded to the service.
+    /// SOME/IP messages with matching id and interface version are be forwarded to the service.
     ///
     /// # Errors
     ///
@@ -56,7 +56,7 @@ pub trait Server {
 pub trait Stub {
     /// Sends a message to the given address.
     ///
-    /// This will attempt to establish a connection to the remote address, if one does not already
+    /// This attempts to establish a connection to the remote address, if one does not already
     /// exist, but this may fail depending on the sockets [`ProtocolType`].
     ///
     /// # Errors
@@ -64,7 +64,7 @@ pub trait Stub {
     /// Returns an error if the connection to the address cannot be established, if the endpoint
     /// has already been dropped, or if the message is invalid.
     ///
-    /// # Protocol Type
+    /// # Protocol type
     ///
     /// Depending on the [`ProtocolType`] of the underlying communication protocol, a [`Stub`]
     /// may or may not be able to establish connections to remote endpoints.
@@ -75,7 +75,7 @@ pub trait Stub {
     /// [`ProtocolType`]: crate::socket::ProtocolType
     #[allow(async_fn_in_trait)]
     async fn send_to(&mut self, address: SocketAddr, message: someip::Message<Bytes>)
-        -> Result<()>;
+    -> Result<()>;
 
     /// Receives a message from a remote address.
     ///

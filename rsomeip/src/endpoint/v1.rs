@@ -12,9 +12,10 @@
 //! - [`Proxy`] is used to send and receive messages from a single remote endpoint.
 
 use crate::{
+    Result,
     endpoint::{self, InterfaceId},
     socket::{self, SocketAddr},
-    someip, Result,
+    someip,
 };
 use rsomeip_bytes::Bytes;
 use tokio::sync::{mpsc, oneshot};

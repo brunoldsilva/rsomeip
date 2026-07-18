@@ -11,9 +11,9 @@ use std::collections::HashMap;
 /// This struct is used to manage the state of a service interface by defining its methods, and
 /// checking incoming and outgoing messages for correctness.
 ///
-/// # Stub vs Proxy
+/// # Stub or proxy
 ///
-/// An interface can behave either as a stub which serves methods to be "called", or as a proxy which
+/// An interface can behave either as a stub which serves methods to be called, or as a proxy which
 /// "calls" these methods. This determines what kind of message types the interface considers valid
 /// for a given method type.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -352,7 +352,7 @@ pub enum Direction {
 /// This enum serves as a way to represent the reason for a message to not be processed, as well as
 /// whether the error should be reported to the user or not.
 ///
-/// # Error Handling
+/// # Error handling
 ///
 /// Depending on the error variant, either an error response should be sent back to the source or the
 /// whole message should be dropped.
