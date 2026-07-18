@@ -16,7 +16,9 @@
 # Rust source code.
 !rsomeip*/
 !rsomeip*/src/
+!rsomeip*/src/**/
 !rsomeip*/examples/
+!rsomeip*/examples/**/
 !rsomeip*/**/*.rs
 
 # Clippy configuration.
@@ -53,3 +55,10 @@
 !docs/
 !docs/**/
 !docs/**/*.md
+
+# cargo-deny and cargo-vet configurations.
+!deny.toml
+!.config/
+!.config/supply-chain/
+!.config/supply-chain/*.toml
+!.config/supply-chain/*.lock

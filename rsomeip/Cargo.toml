@@ -9,7 +9,7 @@ description = "A Rust implementation of AUTOSTAR's Scalable service-Oriented Mid
 
 [dependencies]
 rsomeip-bytes = { path = "../rsomeip-bytes", version = "0.1.0" }
-scc = "2.2.5"
+scc = "3.8.4"
 tokio = { version = "1.29.1", features = [
     "net",
     "rt",

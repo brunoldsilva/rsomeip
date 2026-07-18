@@ -4,6 +4,9 @@
 #
 # More info: <https://just.systems/man/en/>
 
+# Commands for auditing depenencies.
+mod audit "scripts/justfiles/audit.just"
+
 # Commands for building binary targets.
 mod build "scripts/justfiles/build.just"
 

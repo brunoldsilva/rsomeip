@@ -59,13 +59,12 @@ function install-deps {
     cargo install --locked cargo-binstall
     # Download Cargo dependencies.
     cargo binstall --locked --no-confirm --disable-telemetry \
-        cargo-audit \
         cargo-deny \
         cargo-hack \
         cargo-mutants \
         cargo-shear \
         cargo-tarpaulin \
-        cargo-verify
+        cargo-vet
 }
 
 # Entrypoint of the script.
