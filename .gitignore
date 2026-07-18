@@ -15,7 +15,8 @@
 
 # Rust source code.
 !rsomeip*/
-!rsomeip*/**/
+!rsomeip*/src/
+!rsomeip*/examples/
 !rsomeip*/**/*.rs
 
 # Clippy configuration.
@@ -27,6 +28,12 @@
 !.devcontainer/Dockerfile
 !.devcontainer/install-homebrew.sh
 !.devcontainer/install-rust.sh
+
+# Just configuration.
+!justfile
+!scripts/
+!scripts/justfiles/
+!scripts/**/*.just
 
 # GitHub configuration.
 !.github/

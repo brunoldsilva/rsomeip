@@ -1,0 +1,10 @@
+# Just command runner configuration.
+#
+# The purpose of this script is to change the working directory of the `just` commands so that they
+# target this package instead of the entire workspace.
+
+# Use the same commands as the root justfile.
+import '../justfile'
+
+# List available commands.
+_default1: _default
