@@ -9,7 +9,7 @@
 //!
 //! - [`ReturnCode`] helps servers notify clients of the result of a request.
 
-use rsomeip_bytes::{serialize_into, size_hint, Buf, BufMut, Deserialize, LengthField, Serialize};
+use rsomeip_bytes::{Buf, BufMut, Deserialize, LengthField, Serialize, serialize_into, size_hint};
 
 /// Identifier of the method of a service.
 pub type MessageId = u32;

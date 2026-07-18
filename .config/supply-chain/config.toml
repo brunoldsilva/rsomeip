@@ -14,13 +14,13 @@ url = "https://raw.githubusercontent.com/google/supply-chain/main/audits.toml"
 url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 
 [policy.rsomeip]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.rsomeip-bytes]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.rsomeip-proto]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [[exemptions.bytes]]
 version = "1.12.1"
@@ -57,18 +57,6 @@ criteria = "safe-to-deploy"
 [[exemptions.rand]]
 version = "0.8.7"
 criteria = "safe-to-run"
-
-[[exemptions.rsomeip]]
-version = "0.1.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.rsomeip-bytes]]
-version = "0.1.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.rsomeip-proto]]
-version = "0.1.0"
-criteria = "safe-to-deploy"
 
 [[exemptions.saa]]
 version = "5.6.0"

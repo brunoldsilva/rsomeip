@@ -8,17 +8,20 @@ description = "Serialization crate for the SOME/IP on-wire format."
 documentation = "https://docs.rs/rsomeip-bytes"
 readme = "README.md"
 keywords = ["someip", "bytes", "serialization"]
-categories = ["automotive"]
 
 # Inherited from workspace.
 authors.workspace = true
+categories.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
-bytes = "1.10.1"
-thiserror = "2.0.14"
+# Used to generalize writing and reading to and from byte buffers.
+bytes.workspace = true
+# Used to specify error types in library code.
+thiserror.workspace = true
 
 [lints]
+# Inherited from workspace.
 workspace = true

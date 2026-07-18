@@ -15,7 +15,7 @@
 //!
 //! - [`v1`] is a concrete implementation of Version 1 of the SOME/IP protocol.
 
-use crate::{socket::SocketAddr, someip, Result};
+use crate::{Result, socket::SocketAddr, someip};
 use rsomeip_bytes::Bytes;
 
 pub mod v1;
@@ -75,7 +75,7 @@ pub trait Stub {
     /// [`ProtocolType`]: crate::socket::ProtocolType
     #[allow(async_fn_in_trait)]
     async fn send_to(&mut self, address: SocketAddr, message: someip::Message<Bytes>)
-        -> Result<()>;
+    -> Result<()>;
 
     /// Receives a message from a remote address.
     ///

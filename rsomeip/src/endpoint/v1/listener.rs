@@ -9,7 +9,7 @@
 //! - [`ListenerTask`] is an asynchronous task for processing incoming SOME/IP connections.
 
 use super::{Connection, Connections, Interface, InterfaceId, Interfaces};
-use crate::{socket, Result};
+use crate::{Result, socket};
 use tokio::sync::mpsc;
 
 /// Handle to an asynchronous listener for incoming SOME/IP connections.

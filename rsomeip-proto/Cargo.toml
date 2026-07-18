@@ -8,20 +8,24 @@ description = "Sans-IO implementation of the SOME/IP protocol."
 documentation = "https://docs.rs/rsomeip-proto"
 readme = "README.md"
 keywords = ["someip", "sans-io"]
-categories = ["automotive", "network-programming"]
 
 # Inherited from workspace.
 authors.workspace = true
+categories.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
-rsomeip-bytes = { path = "../rsomeip-bytes", version = "0.1.0" }
-thiserror = "2.0.14"
+# Used for serialization of data types according to the SOME/IP on-wire format.
+rsomeip-bytes.workspace = true
+# Used to specify error types in library code.
+thiserror.workspace = true
 
 [features]
+# Implementation of the SOME/IP Transport Protocol (TP) extension.
 tp = []
 
 [lints]
+# Inherited from workspace.
 workspace = true
