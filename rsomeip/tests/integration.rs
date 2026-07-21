@@ -5,7 +5,7 @@
 
 use rsomeip::{
     endpoint::{InterfaceId, Proxy as _, Server as _, Stub as _},
-    socket::{tcp::TcpSocket, udp::UdpSocket, SocketAddr},
+    socket::{SocketAddr, tcp::TcpSocket, udp::UdpSocket},
     someip::{self, MessageType, ReturnCode},
 };
 use rsomeip_bytes::Bytes;
@@ -63,7 +63,10 @@ mod udp {
                     .with_service(interface.service)
                     .with_interface(interface.version)
                     .with_type(MessageType::Request);
-                proxy.send(request).await.expect("client should send request");
+                proxy
+                    .send(request)
+                    .await
+                    .expect("client should send request");
 
                 // Server receives the request
                 let (received, source) = stub
@@ -182,7 +185,8 @@ mod udp {
                         .with_type(MessageType::Request);
                     proxy.send(request).await.expect("should send request");
 
-                    let (received, source) = stub.recv_from().await.expect("should receive request");
+                    let (received, source) =
+                        stub.recv_from().await.expect("should receive request");
                     assert_eq!(&received.payload[..], &[i]);
 
                     let response = received
@@ -256,7 +260,8 @@ mod udp {
 
                 // Server receives both requests and responds
                 for _ in 0..2 {
-                    let (received, source) = stub.recv_from().await.expect("should receive request");
+                    let (received, source) =
+                        stub.recv_from().await.expect("should receive request");
                     let response = received.with_type(MessageType::Response);
                     stub.send_to(source, response)
                         .await
@@ -264,10 +269,16 @@ mod udp {
                 }
 
                 // Both clients receive responses
-                let resp1 = proxy1.recv().await.expect("client1 should receive response");
+                let resp1 = proxy1
+                    .recv()
+                    .await
+                    .expect("client1 should receive response");
                 assert_eq!(resp1.message_type, MessageType::Response);
 
-                let resp2 = proxy2.recv().await.expect("client2 should receive response");
+                let resp2 = proxy2
+                    .recv()
+                    .await
+                    .expect("client2 should receive response");
                 assert_eq!(resp2.message_type, MessageType::Response);
             })
             .await;
@@ -364,7 +375,10 @@ mod tcp {
                     .with_service(interface.service)
                     .with_interface(interface.version)
                     .with_type(MessageType::Request);
-                proxy.send(request).await.expect("client should send request");
+                proxy
+                    .send(request)
+                    .await
+                    .expect("client should send request");
 
                 // Server receives the request
                 let (received, _source) = stub
