@@ -1,4 +1,6 @@
-#![doc = include_str!("../README.md")]
+//! Placeholder.
+
+#![expect(clippy::arithmetic_side_effects, reason = "work in progress")]
 
 // Re-export for convenience.
 pub use bytes::{Buf, BufMut, Bytes, BytesMut};
@@ -17,7 +19,10 @@ mod macros;
 /// bytes long.
 #[derive(Debug, Clone, Copy)]
 pub enum LengthField {
+    /// One byte long length field.
     U8,
+    /// Two byte long length field.
     U16,
+    /// Four byte long length field.
     U32,
 }

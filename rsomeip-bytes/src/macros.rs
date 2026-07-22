@@ -1,3 +1,7 @@
+//! Trait macros.
+//!
+//! This module provides several macros that make it easier to implement the traits in this crate.
+
 /// Serializes a series of variables into the given `buffer`.
 ///
 /// An optional `length` parameter can be specified to serialize the variables using [`serialize_len`].
@@ -64,9 +68,9 @@ macro_rules! size_hint {
         let mut size = 0;
         size += (|length: $crate::LengthField| {
                 match length {
-                    $crate::LengthField::U8 => 0u8.size_hint(),
-                    $crate::LengthField::U16 => 0u16.size_hint(),
-                    $crate::LengthField::U32 => 0u32.size_hint(),
+                    $crate::LengthField::U8 => 0_u8.size_hint(),
+                    $crate::LengthField::U16 => 0_u16.size_hint(),
+                    $crate::LengthField::U32 => 0_u32.size_hint(),
                 }
             })($crate::LengthField::$length);
         $(size += $member.size_hint();)+
@@ -121,24 +125,27 @@ macro_rules! deserialize_from {
 }
 
 #[cfg(test)]
+#[expect(clippy::inline_modules, reason = "false-positive")]
 mod tests {
-    use crate::{Deserialize, Serialize};
+    use crate::{Deserialize as _, Serialize as _};
     use bytes::{Bytes, BytesMut};
 
     #[test]
+    #[expect(clippy::min_ident_chars, reason = "less verbose")]
     fn serialize_macro() {
-        let [a, b, c, d] = [1u8, 2, 3, 4];
+        let [a, b, c, d] = [1_u8, 2, 3, 4];
         let mut buffer = BytesMut::new();
         let mut size = 0;
         size += serialize_into!(&mut buffer, &a, b).expect("should serialize");
         size += serialize_into!(&mut buffer, length = U8, &c, d).expect("should serialize");
         assert_eq!(size, 5);
-        assert_eq!(buffer[..], [1u8, 2, 2, 3, 4]);
+        assert_eq!(buffer[..], [1_u8, 2, 2, 3, 4]);
     }
 
     #[test]
+    #[expect(clippy::min_ident_chars, reason = "less verbose")]
     fn size_hint_macro() {
-        let [a, b, c, d] = [1u8, 2, 3, 4];
+        let [a, b, c, d] = [1_u8, 2, 3, 4];
         let mut size = 0;
         size += size_hint!(&a, b);
         size += size_hint!(length = U32, &c, d);
@@ -146,11 +153,12 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::min_ident_chars, reason = "less verbose")]
     fn deserialize_macro() {
-        let mut buffer = Bytes::copy_from_slice(&[1u8, 2, 2, 3, 4][..]);
+        let mut buffer = Bytes::copy_from_slice(&[1_u8, 2, 2, 3, 4][..]);
         let (a, b) = deserialize_from!(&mut buffer, u8, u8).expect("should deserialize");
         let (c, d) =
             deserialize_from!(&mut buffer, length = U8, u8, u8).expect("should deserialize");
-        assert_eq!([a, b, c, d], [1u8, 2, 3, 4]);
+        assert_eq!([a, b, c, d], [1_u8, 2, 3, 4]);
     }
 }

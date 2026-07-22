@@ -4,6 +4,7 @@
 //! trait for types of the standard library.
 
 use super::{Buf, Bytes, LengthField};
+use std::array;
 
 /// Deserialize data from a SOME/IP byte stream.
 ///
@@ -77,6 +78,13 @@ pub trait Deserialize {
     }
 }
 
+/// Implements [`Deserialize`] for a basic type.
+///
+/// This macro takes the name of the basic type and the [`Buf`] method used to extract it from
+/// serialized data.
+///
+/// The trait implementation checks if the buffer has enough data to extract the type, as measured
+/// using [`std::mem::size_of`]. Returns an [`DeserializeError::InsufficientData`] if it doesn't.
 macro_rules! deserialize_basic_type {
     ($t:ty, $f:ident) => {
         impl Deserialize for $t {
@@ -127,7 +135,7 @@ where
     type Output = Self;
 
     fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, DeserializeError> {
-        Ok(std::array::from_fn(|_| {
+        Ok(array::from_fn(|_| {
             T::deserialize(buffer).unwrap_or_default()
         }))
     }
@@ -148,8 +156,13 @@ where
     }
 }
 
+/// Implements [`Deserialize`] for a tuple.
+///
+/// The implementation is generic over the types of the tuple and implements the trait by calling
+/// [`Deserialize::deserialize`] on each element of the tuple.
 macro_rules! deserialize_tuple {
     ( $( $name:ident )+ ) => {
+        // #[expect(clippy::min_ident_chars, reason = "generic type identifiers")]
         impl<$($name: Deserialize<Output=$name>),+> Deserialize for ($($name,)+) {
             type Output = Self;
             fn deserialize(buffer: &mut impl Buf) -> Result<Self::Output, DeserializeError> {
@@ -254,19 +267,27 @@ pub enum DeserializeError {
 }
 
 #[cfg(test)]
+#[expect(clippy::inline_modules, reason = "false-positive")]
 mod tests {
     use super::*;
     use bytes::Bytes;
 
+    /// Tests the [`Deserialize`] implementation of a basic type.
+    ///
+    /// This macro takes the name of the type and the name of the test as arguments.
+    ///
+    /// It checks if the value `1` can be deserialized from a buffer, and if an error is returned
+    /// from an empty buffer.
     macro_rules! test_deserialize_basic_type {
         ($t:ty, $name:tt) => {
             #[test]
-            #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
             fn $name() {
-                let mut buffer = Bytes::from((1 as $t).to_be_bytes().to_vec());
-                assert_eq!(<$t>::deserialize(&mut buffer), Ok(1 as $t));
+                let value = <$t>::try_from(1_u8).expect("1_u8 fits in every other basic type");
+                let buffer = value.to_be_bytes();
+                let mut cursor = buffer.as_slice();
+                assert_eq!(<$t>::deserialize(&mut cursor), Ok(value));
                 assert_eq!(
-                    <$t>::deserialize(&mut buffer),
+                    <$t>::deserialize(&mut cursor),
                     Err(DeserializeError::InsufficientData {
                         expected: size_of::<$t>(),
                         available: 0
@@ -289,7 +310,7 @@ mod tests {
 
     #[test]
     fn deserialize_bool() {
-        let mut buffer = Bytes::copy_from_slice(&[0u8, 1u8]);
+        let mut buffer = Bytes::copy_from_slice(&[0_u8, 1_u8]);
         assert_eq!(bool::deserialize(&mut buffer), Ok(false));
         assert_eq!(bool::deserialize(&mut buffer), Ok(true));
         assert_eq!(
@@ -303,29 +324,29 @@ mod tests {
 
     #[test]
     fn deserialize_len() {
-        let mut buffer = Bytes::copy_from_slice(&[2u8, 1u8, 2u8, 3u8]);
+        let mut buffer = Bytes::copy_from_slice(&[2_u8, 1_u8, 2_u8, 3_u8]);
         let vec: Vec<u8> =
             Vec::deserialize_len(LengthField::U8, &mut buffer).expect("should deserialize the vec");
-        assert_eq!(&vec[..], &[1u8, 2u8][..]);
+        assert_eq!(vec, [1_u8, 2_u8].as_slice());
     }
 
     #[test]
     fn deserialize_array() {
-        let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8]);
-        assert_eq!(<[u8; 2]>::deserialize(&mut buffer), Ok([1u8, 2u8]));
-        assert_eq!(<[u8; 2]>::deserialize(&mut buffer), Ok([0u8, 0u8]));
+        let mut buffer = Bytes::copy_from_slice(&[1_u8, 2_u8]);
+        assert_eq!(<[u8; 2]>::deserialize(&mut buffer), Ok([1_u8, 2_u8]));
+        assert_eq!(<[u8; 2]>::deserialize(&mut buffer), Ok([0_u8, 0_u8]));
     }
 
     #[test]
     fn deserialize_vec() {
-        let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8]);
+        let mut buffer = Bytes::copy_from_slice(&[1_u8, 2_u8]);
         let vec: Vec<u8> = Vec::deserialize(&mut buffer).expect("should deserialize the vec");
-        assert_eq!(&vec[..], &[1u8, 2u8][..]);
+        assert_eq!(vec, [1_u8, 2_u8].as_slice());
     }
 
     #[test]
     fn deserialize_malformed_vec() {
-        let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8, 3u8]);
+        let mut buffer = Bytes::copy_from_slice(&[1_u8, 2_u8, 3_u8]);
         let error =
             Vec::<u16>::deserialize(&mut buffer).expect_err("should not deserialize the vec");
         assert_eq!(
@@ -339,8 +360,8 @@ mod tests {
 
     #[test]
     fn deserialize_tuple() {
-        let mut buffer = Bytes::copy_from_slice(&[1u8, 2u8]);
-        assert_eq!(<(u8, u8)>::deserialize(&mut buffer), Ok((1u8, 2u8)));
+        let mut buffer = Bytes::copy_from_slice(&[1_u8, 2_u8]);
+        assert_eq!(<(u8, u8)>::deserialize(&mut buffer), Ok((1_u8, 2_u8)));
         assert_eq!(
             <(u8, u8)>::deserialize(&mut buffer),
             Err(DeserializeError::InsufficientData {
@@ -352,14 +373,14 @@ mod tests {
 
     #[test]
     fn deserialize_bytes() {
-        let mut buffer = Bytes::copy_from_slice(&[2u8, 1u8, 2u8, 3u8, 4u8]);
+        let mut buffer = Bytes::copy_from_slice(&[2_u8, 1_u8, 2_u8, 3_u8, 4_u8]);
 
-        let bytes = Bytes::deserialize_len(LengthField::U8, &mut buffer)
+        let first_half = Bytes::deserialize_len(LengthField::U8, &mut buffer)
             .expect("should deserialize the bytes");
-        assert_eq!(&bytes[..], &[1u8, 2u8][..]);
+        assert_eq!(first_half, [1_u8, 2_u8].as_slice());
 
-        let bytes = Bytes::deserialize(&mut buffer).expect("should deserialize the bytes");
-        assert_eq!(&bytes[..], &[3u8, 4u8][..]);
+        let second_half = Bytes::deserialize(&mut buffer).expect("should deserialize the bytes");
+        assert_eq!(second_half, [3_u8, 4_u8].as_slice());
     }
 
     #[test]
@@ -374,6 +395,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::non_ascii_literal, reason = "to test UTF-16")]
     fn deserialize_utf16_be() {
         let raw_string = [
             0xfe_u8, 0xff, // Big-Endian Byte Order Mark
@@ -385,6 +407,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::non_ascii_literal, reason = "to test UTF-16")]
     fn deserialize_utf16_le() {
         let raw_string = [
             0xff_u8, 0xfe, // Little-Endian Byte Order Mark

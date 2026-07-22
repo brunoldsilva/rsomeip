@@ -51,6 +51,8 @@ pedantic = { level = "warn", priority = -1 }
 restriction = { level = "warn", priority = -1 }
 # Alphabetical ordering is undesirable.
 arbitrary_source_item_ordering = "allow"
+# Default representation when dealing with network data.
+big_endian_bytes = "allow"
 # Usage of the restriction lint group is intentional.
 blanket_clippy_restriction_lints = "allow"
 # Used to test at module crate boundaries.
@@ -67,6 +69,8 @@ impl_trait_in_params = "allow"
 missing_inline_in_public_items = "allow"
 # Unnecessary in most cases.
 missing_trait_methods = "allow"
+# Crates should appear flat to external users.
+pub_use = "allow"
 # Preferred method of returning early on error.
 question_mark_used = "allow"
 # Works well with `pattern_type_mismatch = warn`.

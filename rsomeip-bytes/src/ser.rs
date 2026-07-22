@@ -30,9 +30,9 @@ pub trait Serialize {
     /// ```rust
     /// use rsomeip_bytes::{BytesMut, Serialize};
     /// let mut buffer = BytesMut::with_capacity(3);
-    /// assert_eq!(1u8.serialize(&mut buffer), Ok(1));
-    /// assert_eq!(2u16.serialize(&mut buffer), Ok(2));
-    /// assert_eq!(&buffer.freeze()[..], &[1u8, 0u8, 2u8][..]);
+    /// assert_eq!(1_u8.serialize(&mut buffer), Ok(1));
+    /// assert_eq!(2_u16.serialize(&mut buffer), Ok(2));
+    /// assert_eq!(buffer.freeze(), [1_u8, 0_u8, 2_u8].as_slice());
     /// ```
     fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError>;
 
@@ -54,10 +54,11 @@ pub trait Serialize {
     /// ```rust
     /// use rsomeip_bytes::{BytesMut, Serialize, LengthField};
     /// let mut buffer = BytesMut::with_capacity(3);
-    /// let vec = vec![0u8, 1u8];
+    /// let vec = vec![0_u8, 1_u8];
     /// assert_eq!(vec.serialize_len(LengthField::U8, &mut buffer), Ok(3));
-    /// assert_eq!(&buffer.freeze()[..], &[2u8, 0u8, 1u8][..]);
+    /// assert_eq!(buffer.freeze(), [2_u8, 0_u8, 1_u8].as_slice());
     /// ```
+    #[expect(clippy::as_conversions, reason = "not targeting 16 bit systems")]
     fn serialize_len(
         &self,
         length: LengthField,
@@ -65,19 +66,19 @@ pub trait Serialize {
     ) -> Result<usize, SerializeError> {
         let mut size = match length {
             LengthField::U8 => u8::try_from(self.size_hint())
-                .map_err(|_| SerializeError::InvalidLength {
+                .map_err(|_error| SerializeError::InvalidLength {
                     required: self.size_hint(),
-                    maximum: u8::MAX as usize,
+                    maximum: usize::from(u8::MAX),
                 })?
                 .serialize(buffer)?,
             LengthField::U16 => u16::try_from(self.size_hint())
-                .map_err(|_| SerializeError::InvalidLength {
+                .map_err(|_error| SerializeError::InvalidLength {
                     required: self.size_hint(),
-                    maximum: u16::MAX as usize,
+                    maximum: usize::from(u16::MAX),
                 })?
                 .serialize(buffer)?,
             LengthField::U32 => u32::try_from(self.size_hint())
-                .map_err(|_| SerializeError::InvalidLength {
+                .map_err(|_error| SerializeError::InvalidLength {
                     required: self.size_hint(),
                     maximum: u32::MAX as usize,
                 })?
@@ -98,15 +99,22 @@ pub trait Serialize {
     /// ```rust
     /// use rsomeip_bytes::Serialize;
     ///
-    /// assert_eq!(0u8.size_hint(), 1);
+    /// assert_eq!(0_u8.size_hint(), 1);
     /// assert_eq!(0u32.size_hint(), 4);
-    /// assert_eq!(vec![1u8, 2, 3].size_hint(), 3);
+    /// assert_eq!(vec![1_u8, 2, 3].size_hint(), 3);
     /// ```
     ///
     /// [`serialize_len`]: Serialize::serialize_len
     fn size_hint(&self) -> usize;
 }
 
+/// Implements [`Serialize`] for a basic type.
+///
+/// This macro takes the name of the basic type and the [`BufMut`] method used to extract it from
+/// serialized data.
+///
+/// The trait implementation calls the given method on the buffer and returns the size of the
+/// basic type as measured by [`std::mem::size_of`].
 macro_rules! serialize_basic_type {
     ($t:ty, $f:ident) => {
         impl Serialize for $t {
@@ -136,9 +144,9 @@ serialize_basic_type!(f64, put_f64);
 impl Serialize for bool {
     fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
         if *self {
-            1u8.serialize(buffer)
+            1_u8.serialize(buffer)
         } else {
-            0u8.serialize(buffer)
+            0_u8.serialize(buffer)
         }
     }
 
@@ -207,21 +215,26 @@ where
     }
 }
 
+/// Implements [`Serialize`] for a tuple.
+///
+/// The implementation is generic over the types of the tuple and implements the trait by calling
+/// [`Serialize::serialize`] on each element of the tuple.
 macro_rules! serialize_tuple {
     ( $( $name:ident )+ ) => {
+        #[expect(clippy::min_ident_chars, reason = "reduce verbosity")]
         impl<$($name: Serialize),+> Serialize for ($($name,)+)
         {
-            #[allow(non_snake_case)]
+            #[expect(non_snake_case, reason = "single char generic types")]
             fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
-                let ($($name,)+) = self;
+                let &($(ref $name,)+) = self;
                 let mut total = 0;
                 $(total += $name.serialize(buffer)?;)+
                 Ok(total)
             }
 
-            #[allow(non_snake_case)]
+            #[expect(non_snake_case, reason = "single char generic types")]
             fn size_hint(&self) -> usize {
-                let ($($name,)+) = self;
+                let &($(ref $name,)+) = self;
                 let mut total = 0;
                 $(total += $name.size_hint();)+
                 total
@@ -279,12 +292,12 @@ pub trait SerializeString {
     /// let mut buffer = BytesMut::with_capacity(10);
     /// assert_eq!("Hello!".serialize_utf8(&mut buffer, None), Ok(10));
     /// assert_eq!(
-    ///     &buffer.freeze()[..],
+    ///     buffer.freeze(),
     ///     [
     ///         0xef_u8, 0xbb, 0xbf, // UTF-8 Byte Order Mark
     ///         0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x21, // Hello!
     ///         0x00  // Delimiter
-    ///     ]
+    ///     ].as_slice()
     /// );
     /// ```
     fn serialize_utf8(
@@ -310,12 +323,12 @@ pub trait SerializeString {
     /// let mut buffer = BytesMut::with_capacity(12);
     /// assert_eq!("语言处理".serialize_utf16_be(&mut buffer, None), Ok(12));
     /// assert_eq!(
-    ///     &buffer.freeze()[..],
+    ///     buffer.freeze(),
     ///     [
     ///         0xfe_u8, 0xff, // UTF-16 Big Endian Byte Order Mark
     ///         0x8b, 0xed, 0x8a, 0x00, 0x59, 0x04, 0x74, 0x06, // 语言处理
     ///         0x00, 0x00, // Delimiter
-    ///     ]
+    ///     ].as_slice()
     /// );
     /// ```
     fn serialize_utf16_be(
@@ -341,12 +354,12 @@ pub trait SerializeString {
     /// let mut buffer = BytesMut::with_capacity(12);
     /// assert_eq!("语言处理".serialize_utf16_le(&mut buffer, None), Ok(12));
     /// assert_eq!(
-    ///     &buffer.freeze()[..],
+    ///     buffer.freeze(),
     ///     [
     ///         0xff_u8, 0xfe, // UTF-16 Little Endian Byte Order Mark
     ///         0xed, 0x8b, 0x00, 0x8a, 0x04, 0x59, 0x06, 0x74, // 语言处理
     ///         0x00, 0x00, // Delimiter
-    ///     ]
+    ///     ].as_slice()
     /// );
     /// ```
     fn serialize_utf16_le(
@@ -376,13 +389,13 @@ impl SerializeString for &str {
     fn serialize_utf16_be(
         &self,
         buffer: &mut BytesMut,
-        length: Option<LengthField>,
+        len: Option<LengthField>,
     ) -> Result<usize, SerializeError> {
         let string = Utf16String {
             inner: self,
             endianness: Endianness::Big,
         };
-        match length {
+        match len {
             Some(length) => string.serialize_len(length, buffer),
             None => string.serialize(buffer),
         }
@@ -391,13 +404,13 @@ impl SerializeString for &str {
     fn serialize_utf16_le(
         &self,
         buffer: &mut BytesMut,
-        length: Option<LengthField>,
+        len: Option<LengthField>,
     ) -> Result<usize, SerializeError> {
         let string = Utf16String {
             inner: self,
             endianness: Endianness::Little,
         };
-        match length {
+        match len {
             Some(length) => string.serialize_len(length, buffer),
             None => string.serialize(buffer),
         }
@@ -406,12 +419,18 @@ impl SerializeString for &str {
 
 /// A wrapper for serializing UTF-16 strings.
 #[derive(Debug)]
-struct Utf16String<'a> {
-    inner: &'a str,
+struct Utf16String<'string> {
+    /// Wrapped UTF-16 string.
+    inner: &'string str,
+    /// Endianess used when serializing.
     endianness: Endianness,
 }
 
 impl Serialize for Utf16String<'_> {
+    #[expect(
+        clippy::little_endian_bytes,
+        reason = "Utf16String supports both endianess types"
+    )]
     fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
         let mut size = 0;
         match self.endianness {
@@ -441,9 +460,14 @@ impl Serialize for Utf16String<'_> {
     }
 }
 
+/// Byte serialization order.
+///
+/// More info: <https://en.wikipedia.org/wiki/Endianness>.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Endianness {
+    /// Least significant byte is stored first.
     Little,
+    /// Most significant byte is stored first.
     Big,
 }
 
@@ -453,13 +477,19 @@ enum Endianness {
 pub enum SerializeError {
     /// The length of the serialized type does not fit inside the length field.
     #[error("length exceeds capacity of length field: {required} vs {maximum}")]
-    InvalidLength { required: usize, maximum: usize },
+    InvalidLength {
+        /// Length required by type.
+        required: usize,
+        /// Maximum capacity of length field.
+        maximum: usize,
+    },
     /// Some other error has occurred.
     #[error("{0}")]
     Other(String),
 }
 
 #[cfg(test)]
+#[expect(clippy::inline_modules, reason = "false-positive")]
 mod tests {
     use super::*;
 
@@ -471,7 +501,7 @@ mod tests {
                 let result = <$t>::MAX.serialize(&mut buffer);
                 assert_eq!(result, Ok(size_of::<$t>()));
                 assert_eq!(result, Ok(<$t>::MAX.size_hint()));
-                assert_eq!(&buffer.freeze()[..], <$t>::MAX.to_be_bytes());
+                assert_eq!(buffer.freeze(), <$t>::MAX.to_be_bytes().as_slice());
             }
         };
     }
@@ -495,63 +525,63 @@ mod tests {
             .expect("should serialize the bool");
         assert_eq!(size, 1);
         assert_eq!(true.size_hint(), 1);
-        assert_eq!(&buffer.freeze()[..], &[1u8]);
+        assert_eq!(buffer.freeze(), [1_u8].as_slice());
     }
 
     #[test]
     fn serialize_len() {
         let mut buffer = BytesMut::with_capacity(3);
-        let vec = vec![0u8, 1u8];
+        let vec = vec![0_u8, 1_u8];
         assert_eq!(vec.serialize_len(LengthField::U8, &mut buffer), Ok(3));
-        assert_eq!(&buffer.freeze()[..], &[2u8, 0u8, 1u8][..]);
+        assert_eq!(buffer.freeze(), [2_u8, 0_u8, 1_u8].as_slice());
     }
 
     #[test]
     fn serialize_vec() {
         let mut buffer = BytesMut::with_capacity(2);
-        let vec = vec![1u8, 2u8];
+        let vec = vec![1_u8, 2_u8];
         let size = vec
             .serialize(&mut buffer)
             .expect("should serialize the vec");
         assert_eq!(size, 2);
         assert_eq!(size, vec.size_hint());
-        assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
+        assert_eq!(buffer.freeze(), [1_u8, 2_u8].as_slice());
     }
 
     #[test]
     fn serialize_array() {
         let mut buffer = BytesMut::with_capacity(2);
-        let array = [1u8, 2u8];
+        let array = [1_u8, 2_u8];
         let size = array
             .serialize(&mut buffer)
             .expect("should serialize the array");
         assert_eq!(size, 2);
         assert_eq!(size, array.size_hint());
-        assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
+        assert_eq!(buffer.freeze(), [1_u8, 2_u8].as_slice());
     }
 
     #[test]
     fn serialize_tuple() {
         let mut buffer = BytesMut::with_capacity(2);
-        let tuple = (1u8, 2u8);
+        let tuple = (1_u8, 2_u8);
         let size = tuple
             .serialize(&mut buffer)
             .expect("should serialize the tuple");
         assert_eq!(size, 2);
         assert_eq!(size, tuple.size_hint());
-        assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
+        assert_eq!(buffer.freeze(), [1_u8, 2_u8].as_slice());
     }
 
     #[test]
     fn serialize_bytes() {
         let mut buffer = BytesMut::with_capacity(2);
-        let bytes = Bytes::copy_from_slice(&[1u8, 2u8]);
+        let bytes = Bytes::copy_from_slice(&[1_u8, 2_u8]);
         let size = bytes
             .serialize(&mut buffer)
             .expect("should serialize the buffer");
         assert_eq!(size, 2);
         assert_eq!(size, bytes.size_hint());
-        assert_eq!(&buffer.freeze()[..], &[1u8, 2u8][..]);
+        assert_eq!(buffer.freeze(), [1_u8, 2_u8].as_slice());
     }
 
     #[test]
@@ -562,46 +592,49 @@ mod tests {
             .expect("should serialize the string");
         assert_eq!(size, 9);
         assert_eq!(
-            &buffer.freeze()[..],
+            buffer.freeze(),
             [
                 0xef_u8, 0xbb, 0xbf, // UTF-8 Byte Order Mark
                 0x48, 0x65, 0x6c, 0x6c, 0x6f, // Hello
                 0x00  // Delimiter
             ]
+            .as_slice()
         );
     }
 
     #[test]
     fn serialize_utf16_be() {
         let mut buffer = BytesMut::with_capacity(12);
-        let size = "语言处理"
+        let size = "\u{8bed}\u{8a00}\u{5904}\u{7406}"
             .serialize_utf16_be(&mut buffer, None)
             .expect("should serialize the string");
         assert_eq!(size, 12);
         assert_eq!(
-            &buffer.freeze()[..],
+            buffer.freeze(),
             [
                 0xfe_u8, 0xff, // UTF-16 Big Endian Byte Order Mark
                 0x8b, 0xed, 0x8a, 0x00, 0x59, 0x04, 0x74, 0x06, // 语言处理
                 0x00, 0x00, // Delimiter
             ]
+            .as_slice()
         );
     }
 
     #[test]
     fn serialize_utf16_le() {
         let mut buffer = BytesMut::with_capacity(12);
-        let size = "语言处理"
+        let size = "\u{8bed}\u{8a00}\u{5904}\u{7406}"
             .serialize_utf16_le(&mut buffer, None)
             .expect("should serialize the string");
         assert_eq!(size, 12);
         assert_eq!(
-            &buffer.freeze()[..],
+            buffer.freeze(),
             [
                 0xff_u8, 0xfe, // UTF-16 Little Endian Byte Order Mark
                 0xed, 0x8b, 0x00, 0x8a, 0x04, 0x59, 0x06, 0x74, // 语言处理
                 0x00, 0x00, // Delimiter
             ]
+            .as_slice()
         );
     }
 }
