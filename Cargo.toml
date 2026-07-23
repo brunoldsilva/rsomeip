@@ -19,6 +19,8 @@ categories = ["automotive", "network-programming"]
 rsomeip-bytes = { path = "./rsomeip-bytes", version = "0.1.0" }
 # Types and trais for working with bytes.
 bytes = "1.10.1"
+# Micro benchmarking harness.
+criterion = "0.8.2"
 # Random number generators.
 rand = "0.8.5"
 # High-performance concurrent containers.

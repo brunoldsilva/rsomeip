@@ -35,4 +35,4 @@ docs:
     # Check Markdown files.
     markdownlint --ignore-path .gitignore .
     # Check prose in documentation.
-    vale --glob '{rsomeip*/{{{{src,examples}/*.rs,*.md},docs/**/*.md,*.md}' .
+    vale --glob '{rsomeip*/{{{{src,examples,benches}/*.rs,*.md},docs/**/*.md,*.md}' .

@@ -22,6 +22,18 @@ bytes.workspace = true
 # Used to specify error types in library code.
 thiserror.workspace = true
 
+[dev-dependencies]
+# Micro benchmarking harness.
+criterion = { workspace = true, features = ["html_reports"] }
+
 [lints]
 # Inherited from workspace.
 workspace = true
+
+[[bench]]
+name = "serialize"
+harness = false
+
+[[bench]]
+name = "deserialize"
+harness = false

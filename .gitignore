@@ -19,6 +19,8 @@
 !rsomeip*/src/**/
 !rsomeip*/examples/
 !rsomeip*/examples/**/
+!rsomeip*/benches/
+!rsomeip*/benches/**/
 !rsomeip*/**/*.rs
 
 # Clippy configuration.

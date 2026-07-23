@@ -5,7 +5,7 @@
 [Aa]pplications?
 [Aa]sync
 [Dd]atagrams?
-[Ee]ndian
+[Ee]ndian(ess)?
 [GgSs]etters?
 [Mm]iddlewar[Ee]
 [Mm]utex
