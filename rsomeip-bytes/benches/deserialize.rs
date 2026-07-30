@@ -2,24 +2,34 @@
 //!
 //! This module contains benchmarks that measure the performance of [`Deserialize`] implementations.
 
-#![expect(clippy::expect_used, reason = "used to uphold invariants")]
+#![expect(clippy::expect_used, reason = "acceptable in benchmarks")]
 
-use bytes::{Bytes, BytesMut};
-use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
-use rsomeip_bytes::{Deserialize as _, LengthField, Serialize as _, SerializeString as _};
+use bytes::Bytes;
+use criterion::{
+    BatchSize, BenchmarkGroup, Criterion, Throughput, criterion_group, criterion_main,
+    measurement::Measurement,
+};
+use rsomeip_bytes::{
+    Deserialize as _, DynamicArray, DynamicString, LengthU8, LengthU16, LengthU32, LengthZero,
+    Serialize as _, StaticString, Utf8, Utf16BE, Utf16LE,
+};
 use std::{array, f32, f64, hint::black_box, iter};
+
+/// Sizes of length encoded types.
+const DYNAMIC_SIZES: [usize; 4] = [0, 0x00ff, 0x0fff, 0xffff];
 
 /// Benchmarks basic type deserialization.
 fn deserialize_basic_type(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("deserialize_basic_type");
+    let mut group = criterion.benchmark_group("deserialize/basic_type");
     macro_rules! benchmark_basic_type {
         ($name:literal, $value:expr, $class:ty) => {{
             group.bench_function($name, |bench| {
-                let buffer = {
-                    let mut buffer = BytesMut::with_capacity($value.size_hint());
-                    $value.serialize(&mut buffer).expect("valid serialization");
-                    buffer.freeze()
-                };
+                // Create a value to deserialize.
+                let buffer = $value.to_bytes().expect("should serialize the value");
+                // Check if deserialization succeeds.
+                _ = <$class>::deserialize(&mut buffer.clone())
+                    .expect("should deserialize the value");
+                // Benchmark the deserialization.
                 bench.iter_batched(
                     || buffer.clone(),
                     |mut buffer| <$class>::deserialize(black_box(&mut buffer)),
@@ -41,57 +51,23 @@ fn deserialize_basic_type(criterion: &mut Criterion) {
     benchmark_basic_type!("f64", f64::consts::PI, f64);
 }
 
-/// Benchmarks nested tuple deserialization.
-fn deserialize_nested_tuple(criterion: &mut Criterion) {
-    type NestedTuple = ((((i8, i8), (i8, i8), i16), i32), i64);
-    let mut group = criterion.benchmark_group("deserialize_nested_tuple");
-
-    // Deserialize without a length field.
-    group.bench_function("no_len", |bench| {
-        let buffer = {
-            let value: NestedTuple = ((((-1, -1), (-1, -1), -1), -1), -1);
-            let mut buffer = BytesMut::with_capacity(value.size_hint());
-            value.serialize(&mut buffer).expect("valid serialization");
-            buffer.freeze()
-        };
-        bench.iter_batched(
-            || buffer.clone(),
-            |mut buffer| NestedTuple::deserialize(black_box(&mut buffer)),
-            BatchSize::SmallInput,
-        );
-    });
-
-    // Deserialize with a length field.
-    group.bench_function("len", |bench| {
-        let buffer = {
-            let value: NestedTuple = ((((-1, -1), (-1, -1), -1), -1), -1);
-            let mut buffer = BytesMut::with_capacity(value.size_hint());
-            value
-                .serialize_len(LengthField::U8, &mut buffer)
-                .expect("valid serialization");
-            buffer.freeze()
-        };
-        bench.iter_batched(
-            || buffer.clone(),
-            |mut buffer| NestedTuple::deserialize_len(LengthField::U8, black_box(&mut buffer)),
-            BatchSize::SmallInput,
-        );
-    });
-}
-
-/// Benchmarks flat tuple deserialization.
-fn deserialize_flat_tuple(criterion: &mut Criterion) {
+/// Benchmarks tuple deserialization.
+fn deserialize_tuple(criterion: &mut Criterion) {
     type FlatTuple = (i8, i8, i8, i8, i16, i32, i64);
-    let mut group = criterion.benchmark_group("deserialize_flat_tuple");
+    type NestedTuple = ((((i8, i8), (i8, i8), i16), i32), i64);
 
-    // Deserialize without a length field.
-    group.bench_function("no_len", |bench| {
-        let buffer = {
-            let value: FlatTuple = (-1, -1, -1, -1, -1, -1, -1);
-            let mut buffer = BytesMut::with_capacity(value.size_hint());
-            value.serialize(&mut buffer).expect("valid serialization");
-            buffer.freeze()
-        };
+    // Group the two benchmarks.
+    let mut group = criterion.benchmark_group("deserialize/tuple");
+
+    group.bench_function("flat", |bench| {
+        // Create a value to deserialize.
+        let value: FlatTuple = (-1, -1, -1, -1, -1, -1, -1);
+        let buffer = value.to_bytes().expect("should serialize the type");
+
+        // Check if deserialization succeeds.
+        _ = FlatTuple::deserialize(&mut buffer.clone()).expect("should deserialize the value");
+
+        // Benchmark the deserialization.
         bench.iter_batched(
             || buffer.clone(),
             |mut buffer| FlatTuple::deserialize(black_box(&mut buffer)),
@@ -99,72 +75,171 @@ fn deserialize_flat_tuple(criterion: &mut Criterion) {
         );
     });
 
-    // Deserialize with a length field.
-    group.bench_function("len", |bench| {
-        let buffer = {
-            let value: FlatTuple = (-1, -1, -1, -1, -1, -1, -1);
-            let mut buffer = BytesMut::with_capacity(value.size_hint());
-            value
-                .serialize_len(LengthField::U8, &mut buffer)
-                .expect("valid serialization");
-            buffer.freeze()
-        };
+    group.bench_function("nested", |bench| {
+        // Create a value to deserialize.
+        let value: NestedTuple = ((((-1, -1), (-1, -1), -1), -1), -1);
+        let buffer = value.to_bytes().expect("should serialize the value");
+
+        // Check if deserialization succeeds.
+        _ = NestedTuple::deserialize(&mut buffer.clone()).expect("should deserialize the value");
+
+        // Benchmark the deserialization.
         bench.iter_batched(
             || buffer.clone(),
-            |mut buffer| FlatTuple::deserialize_len(LengthField::U8, black_box(&mut buffer)),
+            |mut buffer| NestedTuple::deserialize(black_box(&mut buffer)),
             BatchSize::SmallInput,
         );
     });
 }
 
-/// Benchmarks [`Vec<u8>`] deserialization.
-fn deserialize_vec(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("deserialize_vec");
+/// Benchmarks dynamic array deserialization.
+fn deserialize_dynamic_array(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("deserialize/dynamic_array");
 
-    // Deserialize a `Vec` of varying length without a length field.
-    for size in [0_usize, 0x00FF, 0x0FFF, 0xFFFF] {
-        group
-            .throughput(Throughput::Bytes(
-                u64::try_from(size).expect("safe conversion"),
-            ))
-            .bench_with_input(format!("{size}"), &size, |bench, &size| {
-                let buffer = {
-                    let value: Vec<u8> = (0..size)
-                        .map(|current| u8::try_from(current.rem_euclid(255)).unwrap_or(0))
-                        .collect();
-                    let mut buffer = BytesMut::with_capacity(size);
-                    value.serialize(&mut buffer).expect("valid serialization");
-                    buffer.freeze()
-                };
-                bench.iter_batched(
-                    || buffer.clone(),
-                    |mut buffer| Vec::<u8>::deserialize(black_box(&mut buffer)),
-                    BatchSize::SmallInput,
-                );
-            });
-    }
+    benchmark_dynamic_array::<LengthZero>(&mut group, "LengthZero");
+    benchmark_dynamic_array::<LengthU8>(&mut group, "LengthU8");
+    benchmark_dynamic_array::<LengthU16>(&mut group, "LengthU16");
+    benchmark_dynamic_array::<LengthU32>(&mut group, "LengthU32");
+}
 
-    // Deserialize a `Vec` of varying length with a length field.
-    for size in [0_usize, 0x00FF, 0x0FFF, 0xFFFF] {
-        group
-            .throughput(Throughput::Bytes(
-                u64::try_from(size).expect("safe conversion"),
-            ))
-            .bench_with_input(format!("len/{size}"), &size, |bench, &size| {
-                let buffer = {
-                    let value: Vec<u8> = (0..size)
-                        .map(|current| u8::try_from(current.rem_euclid(255)).unwrap_or(0))
-                        .collect();
-                    let mut buffer = BytesMut::with_capacity(size);
-                    value
-                        .serialize_len(LengthField::U16, &mut buffer)
-                        .expect("valid serialization");
-                    buffer.freeze()
-                };
+/// Benchmarks dynamic array deserialization for a specific length field.
+fn benchmark_dynamic_array<Length>(
+    group: &mut BenchmarkGroup<'_, impl Measurement>,
+    name: &'static str,
+) where
+    Length: rsomeip_bytes::Length,
+{
+    // Benchmark multiple sizes.
+    for size in DYNAMIC_SIZES {
+        // Skip if the value is greater than the capacity of the length field.
+        if Length::capacity().is_none_or(|capacity| size > capacity) {
+            continue;
+        }
+        let size = u64::try_from(size).expect("should fit in u64");
+        // Measure the throughput.
+        group.throughput(Throughput::Bytes(size)).bench_with_input(
+            format!("{name}/{size}"),
+            &size,
+            |bench, &size| {
+                // Create a value to serialize.
+                let value: Vec<u8> = (0..size)
+                    .map(|current| u8::try_from(current.rem_euclid(255)).unwrap_or(0))
+                    .collect();
+                let buffer = DynamicArray::<Length, _>::from(&value)
+                    .to_bytes()
+                    .expect("should serialize the value");
+                // Check if deserialization succeeds.
+                _ = DynamicArray::<Length, Vec<u8>>::deserialize(&mut buffer.clone())
+                    .expect("should deserialize the value");
+                // Benchmark the deserialization.
                 bench.iter_batched(
                     || buffer.clone(),
                     |mut buffer| {
-                        Vec::<u8>::deserialize_len(LengthField::U16, black_box(&mut buffer))
+                        DynamicArray::<Length, Vec<u8>>::deserialize(black_box(&mut buffer))
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
+/// Benchmarks static array deserialization.
+fn deserialize_static_array(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("deserialize/static_array");
+
+    benchmark_static_array::<0>(&mut group);
+    benchmark_static_array::<16>(&mut group);
+    benchmark_static_array::<256>(&mut group);
+}
+
+/// Benchmarks static array deserialization for a specific length.
+fn benchmark_static_array<const N: usize>(group: &mut BenchmarkGroup<'_, impl Measurement>) {
+    // Measure the throughput.
+    group
+        .throughput(Throughput::Bytes(
+            u64::try_from(N).expect("should fit in u64"),
+        ))
+        .bench_function(format!("{N}"), |bench| {
+            // Create a value to serialize.
+            let value: [u8; N] =
+                array::from_fn(|index| u8::try_from(index.rem_euclid(255)).unwrap_or(0));
+            let buffer = value.to_bytes().expect("should serialize the value");
+            // Check if deserialization succeeds.
+            _ = <[u8; N]>::deserialize(&mut buffer.clone()).expect("should deserialize the value");
+            // Benchmark the deserialization.
+            bench.iter_batched(
+                || buffer.clone(),
+                |mut buffer| <[u8; N]>::deserialize(black_box(&mut buffer)),
+                BatchSize::SmallInput,
+            );
+        });
+}
+
+/// Benchmarks dynamic string deserialization.
+fn deserialize_dynamic_string(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("deserialize/dynamic_string");
+
+    // UTF-8
+    let make_utf8 = |size: usize| {
+        let size = size.saturating_sub(4); // BOM + Delimiter
+        String::from_utf8(iter::repeat_n(42, size).collect()).expect("should be valid UTF-8")
+    };
+    benchmark_dynamic_string::<LengthZero, Utf8>(&mut group, "UTF-8/LengthZero", make_utf8);
+    benchmark_dynamic_string::<LengthU32, Utf8>(&mut group, "UTF-8/LengthU32", make_utf8);
+
+    // UTF-16
+    let make_uft16 = |size: usize| {
+        let size = size.saturating_sub(4); // BOM + Delimiter
+        String::from_utf16(&iter::repeat_n(42, size.div_euclid(2)).collect::<Vec<u16>>())
+            .expect("should be valid UTF-16")
+    };
+
+    // UTF-16 Big Endian
+    benchmark_dynamic_string::<LengthZero, Utf16BE>(&mut group, "UTF-16BE/LengthZero", make_uft16);
+    benchmark_dynamic_string::<LengthU32, Utf16BE>(&mut group, "UTF-16BE/LengthU32", make_uft16);
+
+    // UTF-16 Little Endian
+    benchmark_dynamic_string::<LengthZero, Utf16LE>(&mut group, "UTF-16LE/LengthZero", make_uft16);
+    benchmark_dynamic_string::<LengthU32, Utf16LE>(&mut group, "UTF-16LE/LengthU32", make_uft16);
+}
+
+/// Benchmarks dynamic string deserialization for a specific length field.
+fn benchmark_dynamic_string<Length, Encoding>(
+    group: &mut BenchmarkGroup<'_, impl Measurement>,
+    name: &'static str,
+    value_fn: fn(usize) -> String,
+) where
+    Length: rsomeip_bytes::Length,
+    Encoding: rsomeip_bytes::Encoding,
+{
+    // Benchmark multiple sizes.
+    for size in DYNAMIC_SIZES {
+        // Skip if the value is greater than the capacity of the length field.
+        if Length::capacity().is_none_or(|capacity| size > capacity) {
+            continue;
+        }
+        // Measure the throughput.
+        group
+            .throughput(Throughput::Bytes(
+                u64::try_from(size).expect("should fit in u64"),
+            ))
+            .bench_with_input(format!("{name}/{size}"), &size, |bench, &size| {
+                // Create a value to serialize.
+                let value = value_fn(size);
+                let buffer = DynamicString::<Length, Encoding, _>::from(&value)
+                    .to_bytes()
+                    .expect("should serialize the value");
+                // Check if deserialization succeeds.
+                _ = DynamicString::<Length, Encoding, String>::deserialize(&mut buffer.clone())
+                    .expect("should deserialize the value");
+                // Benchmark the deserialization.
+                bench.iter_batched(
+                    || buffer.clone(),
+                    |mut buffer| {
+                        DynamicString::<Length, Encoding, String>::deserialize(black_box(
+                            &mut buffer,
+                        ))
                     },
                     BatchSize::SmallInput,
                 );
@@ -172,88 +247,89 @@ fn deserialize_vec(criterion: &mut Criterion) {
     }
 }
 
-/// Benchmarks array deserialization.
-fn deserialize_array(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("deserialize_array");
+/// Benchmarks static string deserialization.
+fn deserialize_static_string(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("deserialize/static_string");
 
-    macro_rules! benchmark_array {
-        ($array:ident, $class:ty) => {{
-            group
-                .throughput(Throughput::Bytes(
-                    u64::try_from($array.len()).expect("safe conversion"),
-                ))
-                .bench_with_input(format!("{}", $array.len()), &$array, |bench, &array| {
-                    let buffer = {
-                        let mut buffer = BytesMut::with_capacity(array.len());
-                        array.serialize(&mut buffer).expect("valid serialization");
-                        buffer.freeze()
-                    };
-                    bench.iter_batched(
-                        || buffer.clone(),
-                        |mut buffer| <$class>::deserialize(black_box(&mut buffer)),
-                        BatchSize::SmallInput,
-                    );
-                });
-        }};
-    }
+    // UTF-8
+    let make_utf8 = |size: usize| {
+        let size = size.saturating_sub(4); // BOM + Delimiter
+        String::from_utf8(iter::repeat_n(42, size).collect()).expect("should be valid UTF-8")
+    };
+    benchmark_static_string::<4, Utf8>(&mut group, "UTF-8", make_utf8);
+    benchmark_static_string::<16, Utf8>(&mut group, "UTF-8", make_utf8);
+    benchmark_static_string::<256, Utf8>(&mut group, "UTF-8", make_utf8);
 
-    macro_rules! benchmark_array_len {
-        ($array:ident, $class:ty) => {{
-            group
-                .throughput(Throughput::Bytes(
-                    u64::try_from($array.len()).expect("safe conversion"),
-                ))
-                .bench_with_input(format!("len/{}", $array.len()), &$array, |bench, &array| {
-                    let buffer = {
-                        let mut buffer = BytesMut::with_capacity(array.len());
-                        array
-                            .serialize_len(LengthField::U16, &mut buffer)
-                            .expect("valid serialization");
-                        buffer.freeze()
-                    };
-                    bench.iter_batched(
-                        || buffer.clone(),
-                        |mut buffer| {
-                            <$class>::deserialize_len(LengthField::U16, black_box(&mut buffer))
-                        },
-                        BatchSize::SmallInput,
-                    );
-                });
-        }};
-    }
+    // UTF-16
+    let make_uft16 = |size: usize| {
+        let size = size.saturating_sub(4); // BOM + Delimiter
+        String::from_utf16(&iter::repeat_n(42, size.div_euclid(2)).collect::<Vec<u16>>())
+            .expect("should be valid UTF-16")
+    };
 
-    let array_ff: [u8; 0x00FF] =
-        array::from_fn(|index| u8::try_from(index.rem_euclid(255)).unwrap_or(0));
-    let array_fff: [u8; 0x0FFF] =
-        array::from_fn(|index| u8::try_from(index.rem_euclid(255)).unwrap_or(0));
-    let array_ffff: [u8; 0xFFFF] =
-        array::from_fn(|index| u8::try_from(index.rem_euclid(255)).unwrap_or(0));
+    // UTF-16 Big Endian
+    benchmark_static_string::<4, Utf16BE>(&mut group, "UTF-16BE", make_uft16);
+    benchmark_static_string::<16, Utf16BE>(&mut group, "UTF-16BE", make_uft16);
+    benchmark_static_string::<256, Utf16BE>(&mut group, "UTF-16BE", make_uft16);
 
-    // Deserialize arrays of varying length without a length field.
-    benchmark_array!(array_ff, [u8; 0x00FF]);
-    benchmark_array!(array_fff, [u8; 0x0FFF]);
-    benchmark_array!(array_ffff, [u8; 0xFFFF]);
+    // UTF-16 Little Endian
+    benchmark_static_string::<4, Utf16LE>(&mut group, "UTF-16LE", make_uft16);
+    benchmark_static_string::<16, Utf16LE>(&mut group, "UTF-16LE", make_uft16);
+    benchmark_static_string::<256, Utf16LE>(&mut group, "UTF-16LE", make_uft16);
+}
 
-    // Deserialize arrays of varying length with a length field.
-    benchmark_array_len!(array_ff, [u8; 0x00FF]);
-    benchmark_array_len!(array_fff, [u8; 0x0FFF]);
-    benchmark_array_len!(array_ffff, [u8; 0xFFFF]);
+/// Benchmarks static string deserialization for a specific length field.
+fn benchmark_static_string<const N: usize, Encoding>(
+    group: &mut BenchmarkGroup<'_, impl Measurement>,
+    name: &'static str,
+    value_fn: fn(usize) -> String,
+) where
+    Encoding: rsomeip_bytes::Encoding,
+{
+    // Measure the throughput.
+    group
+        .throughput(Throughput::Bytes(
+            u64::try_from(N).expect("should fit in u64"),
+        ))
+        .bench_function(format!("{name}/{N}"), |bench| {
+            // Create a value to serialize.
+            let value = value_fn(N);
+            let buffer = StaticString::<N, Encoding, _>::from(&value)
+                .to_bytes()
+                .expect("should serialize the value");
+            // Check if deserialization succeeds.
+            _ = StaticString::<N, Encoding, String>::deserialize(&mut buffer.clone())
+                .expect("should deserialize the value");
+            // Benchmark the deserialization.
+            bench.iter_batched(
+                || buffer.clone(),
+                |mut buffer| {
+                    StaticString::<N, Encoding, String>::deserialize(black_box(&mut buffer))
+                },
+                BatchSize::SmallInput,
+            );
+        });
 }
 
 /// Benchmarks [`Bytes`] deserialization.
 fn deserialize_bytes(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("deserialize_bytes");
+    let mut group = criterion.benchmark_group("deserialize/bytes");
 
-    // Deserialize a `Bytes` of varying length without a length field.
-    for size in [0_usize, 0x00FF, 0x0FFF, 0xFFFF] {
+    // Deserialize a `Bytes` of varying length.
+    for size in DYNAMIC_SIZES {
+        // Measure the throughput.
         group
             .throughput(Throughput::Bytes(
-                u64::try_from(size).expect("safe conversion"),
+                u64::try_from(size).expect("should fit in u64"),
             ))
             .bench_with_input(format!("{size}"), &size, |bench, &size| {
+                // Create a value to deserialize.
                 let buffer: Bytes = (0..size)
                     .map(|current| u8::try_from(current.rem_euclid(255)).unwrap_or(0))
                     .collect();
+                // Check if deserialization succeeds.
+                _ = Bytes::deserialize(&mut buffer.clone()).expect("should deserialize the type");
+                // Benchmark the deserialization.
                 bench.iter_batched(
                     || buffer.clone(),
                     |mut buffer| Bytes::deserialize(black_box(&mut buffer)),
@@ -261,106 +337,16 @@ fn deserialize_bytes(criterion: &mut Criterion) {
                 );
             });
     }
-
-    // Deserialize a `Bytes` of varying length with a length field.
-    for size in [0_usize, 0x00FF, 0x0FFF, 0xFFFF] {
-        group
-            .throughput(Throughput::Bytes(
-                u64::try_from(size).expect("safe conversion"),
-            ))
-            .bench_with_input(format!("len/{size}"), &size, |bench, &size| {
-                let buffer = {
-                    let value: Bytes = (0..size)
-                        .map(|current| u8::try_from(current.rem_euclid(255)).unwrap_or(0))
-                        .collect();
-                    let mut buffer = BytesMut::with_capacity(size);
-                    value
-                        .serialize_len(LengthField::U16, &mut buffer)
-                        .expect("valid serialziation");
-                    buffer.freeze()
-                };
-                bench.iter_batched(
-                    || buffer.clone(),
-                    |mut buffer| Bytes::deserialize_len(LengthField::U16, black_box(&mut buffer)),
-                    BatchSize::SmallInput,
-                );
-            });
-    }
-}
-
-/// Benchmarks [`String`] deserialization.
-fn deserialize_string(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("deserialize_string");
-
-    macro_rules! benchmark_string {
-        ($format:literal, $method:ident, $length:expr, $throughput:expr, $de:expr) => {{
-            for size in [0_usize, 0x00FF, 0x0FFF, 0xFFFF] {
-                group
-                    .throughput(Throughput::Bytes(
-                        u64::try_from(size.saturating_mul($throughput)).expect("safe conversion"),
-                    ))
-                    .bench_with_input(format!("{}/{size}", $format), &size, |bench, &size| {
-                        let buffer = {
-                            let value =
-                                String::from_utf8(iter::repeat_n(42, size).collect::<Vec<u8>>())
-                                    .expect("valid String");
-                            let mut buffer =
-                                BytesMut::with_capacity(size.saturating_mul($throughput));
-                            value
-                                .as_str()
-                                .$method(&mut buffer, $length)
-                                .expect("valid serialization");
-                            buffer.freeze()
-                        };
-                        bench.iter_batched(|| buffer.clone(), $de, BatchSize::SmallInput);
-                    });
-            }
-        }};
-    }
-
-    // Deserialize a `String` of varying length without a length field.
-    benchmark_string!("UTF-8", serialize_utf8, None, 1, |mut buffer| {
-        String::deserialize(black_box(&mut buffer))
-    });
-    benchmark_string!("UTF-16BE", serialize_utf16_be, None, 2, |mut buffer| {
-        String::deserialize(black_box(&mut buffer))
-    });
-    benchmark_string!("UTF-16LE", serialize_utf16_le, None, 2, |mut buffer| {
-        String::deserialize(black_box(&mut buffer))
-    });
-
-    // Deserialize a `String` of varying length with a length field.
-    benchmark_string!(
-        "UTF-8/len",
-        serialize_utf8,
-        Some(LengthField::U32),
-        1,
-        |mut buffer| String::deserialize_len(LengthField::U32, black_box(&mut buffer))
-    );
-    benchmark_string!(
-        "UTF-16BE/len",
-        serialize_utf16_be,
-        Some(LengthField::U32),
-        2,
-        |mut buffer| String::deserialize_len(LengthField::U32, black_box(&mut buffer))
-    );
-    benchmark_string!(
-        "UTF-16LE/len",
-        serialize_utf16_le,
-        Some(LengthField::U32),
-        2,
-        |mut buffer| String::deserialize_len(LengthField::U32, black_box(&mut buffer))
-    );
 }
 
 criterion_group!(
     benches,
     deserialize_basic_type,
-    deserialize_nested_tuple,
-    deserialize_flat_tuple,
-    deserialize_vec,
-    deserialize_array,
+    deserialize_tuple,
+    deserialize_dynamic_array,
+    deserialize_static_array,
+    deserialize_dynamic_string,
+    deserialize_static_string,
     deserialize_bytes,
-    deserialize_string
 );
 criterion_main!(benches);

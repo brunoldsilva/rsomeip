@@ -9,6 +9,8 @@ all:
     just check rust
     # Perform static analysis of Shell scripts.
     just check shellscript
+    # Perform static analysis of documentation.
+    just check docs
 
 # Perform static analysis of Rust code.
 rust:
@@ -26,7 +28,7 @@ shellscript:
     # Check if shell scripts are correctly formatted.
     shfmt --indent 4 --list .
     # Check if Shell scripts are correct.
-    find . -type f -name '*.sh' -print0 | xargs -0 shellcheck
+    find . -type f -name '*.sh' -print0 | xargs --no-run-if-empty -0 shellcheck
 
 alias sh := shellscript
 

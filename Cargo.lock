@@ -479,7 +479,7 @@ name = "rsomeip"
 version = "0.1.0"
 dependencies = [
  "rand",
- "rsomeip-bytes",
+ "rsomeip-bytes 0.1.0",
  "scc",
  "tokio",
  "tokio-test",
@@ -489,6 +489,16 @@ dependencies = [
 [[package]]
 name = "rsomeip-bytes"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f7ea94cf667510ae45f76c5f50433d7aa31d01c68490953da826d62d4278b8f"
+dependencies = [
+ "bytes",
+ "thiserror",
+]
+
+[[package]]
+name = "rsomeip-bytes"
+version = "0.2.0-alpha"
 dependencies = [
  "bytes",
  "criterion",
@@ -499,7 +509,7 @@ dependencies = [
 name = "rsomeip-proto"
 version = "0.1.0"
 dependencies = [
- "rsomeip-bytes",
+ "rsomeip-bytes 0.1.0",
  "thiserror",
 ]
 

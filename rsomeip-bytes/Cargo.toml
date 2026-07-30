@@ -3,7 +3,7 @@
 
 [package]
 name = "rsomeip-bytes"
-version = "0.1.0"
+version = "0.2.0-alpha"
 description = "Serialization crate for the SOME/IP on-wire format."
 documentation = "https://docs.rs/rsomeip-bytes"
 readme = "README.md"
@@ -15,16 +15,23 @@ categories.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+rust-version.workspace = true
 
 [dependencies]
-# Used to generalize writing and reading to and from byte buffers.
-bytes.workspace = true
+# Used to generalize writing and reading byte buffers.
+bytes = { workspace = true }
 # Used to specify error types in library code.
-thiserror.workspace = true
+thiserror = { workspace = true }
 
 [dev-dependencies]
 # Micro benchmarking harness.
 criterion = { workspace = true, features = ["html_reports"] }
+
+[features]
+# Features enabled by default.
+default = ["std"]
+# Adds support for `std` types.
+std = ["bytes/std", "thiserror/std"]
 
 [lints]
 # Inherited from workspace.

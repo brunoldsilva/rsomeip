@@ -14,6 +14,8 @@ alias a := all
 rust *ARGS:
     # Build the benchmarks first.
     cargo build --benches --release
+    # Do a quick sanity check.
+    cargo test --benches
     # Wait for the environment to stabilize before running the benchmarks.
     sleep 30
     # Run the benchmark tests on an isolated core.

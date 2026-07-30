@@ -23,6 +23,10 @@ function main {
             install-toolchain
             shift
             ;;
+        targets)
+            install-targets
+            shift
+            ;;
         deps)
             install-deps
             shift
@@ -30,6 +34,7 @@ function main {
         all)
             install-rustup
             install-toolchain
+            install-targets
             install-deps
             shift
             ;;
@@ -52,6 +57,11 @@ function install-rustup {
 function install-toolchain {
     # Install the toolchains.
     rustup toolchain install --profile default stable 1.85
+}
+
+function install-targets {
+    # A `no_std` target.
+    rustup target install thumbv7m-none-eabi
 }
 
 function install-deps {

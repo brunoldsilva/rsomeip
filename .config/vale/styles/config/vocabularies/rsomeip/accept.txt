@@ -6,17 +6,17 @@
 [Aa]sync
 [Dd]atagrams?
 [Ee]ndian(ess)?
+[Ee]nums?
 [GgSs]etters?
 [Mm]iddlewar[Ee]
 [Mm]utex
 AUTOSAR
 connectionless
 const
-enum
 impl
+licensed as above
 rsomeip
 runtime
 Tokio
 Transmission Control Protocol
 User Datagram Protocol
-licensed as above
