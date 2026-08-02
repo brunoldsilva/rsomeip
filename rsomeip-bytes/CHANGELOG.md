@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0]
+
 ### Added
 
 - `DynamicString` and `StaticString` types.
@@ -100,5 +102,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     These represent several error conditions that can be encountered during the serialization and
     deserialization process, respectively.
 
-[Unreleased]: https://github.com/brunoldsilva/rsomeip/compare/rsomeip-bytes-v0.1.0...HEAD
+[Unreleased]: https://github.com/brunoldsilva/rsomeip/compare/rsomeip-bytes-v0.2.0...HEAD
+[0.2.0]: https://github.com/brunoldsilva/rsomeip/compare/rsomeip-bytes-v0.1.0...rsomeip-bytes-v0.2.0
 [0.1.0]: https://github.com/brunoldsilva/rsomeip/releases/tag/rsomeip-bytes-v0.1.0

@@ -3,7 +3,7 @@
 
 [package]
 name = "rsomeip-bytes"
-version = "0.2.0-alpha"
+version = "0.2.0"
 description = "Serialization crate for the SOME/IP on-wire format."
 documentation = "https://docs.rs/rsomeip-bytes"
 readme = "README.md"
