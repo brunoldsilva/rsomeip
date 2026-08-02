@@ -6,7 +6,7 @@
 //! Serialization according to the SOME/IP on-wire format.
 //!
 //! This crate provides traits and types to assist in correctly implementing the serialization and
-//! deserialization of types according to the [Open SOME/IP Specification][open-someip-spec].
+//! deserialization of data according to the [Open SOME/IP Specification][open-someip-spec].
 //!
 //! # Getting started
 //!
@@ -103,9 +103,9 @@
 //!
 //! The main goal with this crate is to have your types implement the [`Serialize`] and
 //! [`Deserialize`] traits so that the other `rsomeip` crates can abstract the serialization and
-//! deserialization of your types.
+//! deserialization process.
 //!
-//! To make it easier, this crate implements these traits for several types of the Rust standard
+//! To make this easier, this crate implements these traits for several types of the Rust standard
 //! library and provides some convenient wrappers for those that don't. This is enough to cover most
 //! use cases foreseen by the specification.
 //!
@@ -310,4 +310,4 @@ pub use string::{DynamicString, Encoding, StaticString, Utf8, Utf16BE, Utf16LE};
 #[cfg(doc)]
 #[doc(hidden)]
 #[doc = include_str!("../README.md")]
-pub struct ReadMeCheck;
+struct ReadMeCheck;

@@ -96,6 +96,9 @@ pub trait Serialize {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, thiserror::Error)]
 #[non_exhaustive]
 pub enum SerializeError {
+    /// The target buffer doesn't have enough capacity for `self`.
+    #[error("buffer would overflow")]
+    BufferOverflow,
     /// An invariant of the serialized type wasn't upheld.
     #[error("invariant failed: {0}")]
     InvariantFailed(Cow<'static, str>),
@@ -108,9 +111,6 @@ pub enum SerializeError {
     /// Size exceeds the capacity of [`usize`].
     #[error("size exceeds capacity of `usize`")]
     SizeOverflow,
-    /// The target buffer doesn't have enough capacity for `self`.
-    #[error("writing out of bounds")]
-    WouldOverflow,
 }
 
 impl SerializeError {
