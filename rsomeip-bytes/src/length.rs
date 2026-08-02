@@ -558,7 +558,6 @@ where
 }
 
 #[cfg(test)]
-#[expect(clippy::inline_modules, reason = "rust-clippy#17342")]
 mod tests {
     use super::*;
     use crate::Serialize;

@@ -26,6 +26,27 @@ pub struct Interface {
     pub methods: HashMap<MethodId, MethodType>,
 }
 
+/// Shorthand for making an error message.
+macro_rules! drop {
+    ($reason:expr) => {
+        Err(MessageError::Dropped($reason))
+    };
+}
+
+/// Shorthand for making an error message.
+macro_rules! invalid {
+    ($reason:expr) => {
+        Err(MessageError::Invalid($reason))
+    };
+}
+
+/// Shorthand for making an error message.
+macro_rules! invalid_or_dropped {
+    ($message_type:expr, $reason:expr) => {
+        Err(MessageError::invalid_or_dropped($message_type, $reason))
+    };
+}
+
 impl Interface {
     /// Returns `self` as a [`Stub`].
     ///
@@ -204,30 +225,7 @@ impl Interface {
     pub fn get_mut(&mut self, id: MethodId) -> Option<&mut MethodType> {
         self.methods.get_mut(&id)
     }
-}
 
-/// Shorthand for making an error message.
-macro_rules! drop {
-    ($reason:expr) => {
-        Err((MessageError::Dropped($reason)))
-    };
-}
-
-/// Shorthand for making an error message.
-macro_rules! invalid {
-    ($reason:expr) => {
-        Err((MessageError::Invalid($reason)))
-    };
-}
-
-/// Shorthand for making an error message.
-macro_rules! invalid_or_dropped {
-    ($message_type:expr, $reason:expr) => {
-        Err((MessageError::invalid_or_dropped($message_type, $reason)))
-    };
-}
-
-impl Interface {
     /// Checks if the `message` is valid in the given `direction`.
     ///
     /// This is used to confirm that the message parameters are correctly configured for this
@@ -253,7 +251,7 @@ impl Interface {
 
         // Check if the message type is correct.
         match direction {
-            Direction::Incoming => match (self.flavor, method) {
+            Direction::Incoming => match (self.flavor, *method) {
                 (InterfaceType::Stub, MethodType::Procedure) => {
                     if message.message_type() != MessageType::RequestNoReturn {
                         return drop!(ReturnCode::WrongMessageType);
@@ -279,7 +277,7 @@ impl Interface {
                 }
                 _ => return drop!(ReturnCode::WrongMessageType),
             },
-            Direction::Outgoing => match (self.flavor, method) {
+            Direction::Outgoing => match (self.flavor, *method) {
                 (InterfaceType::Stub, MethodType::Method) => {
                     if !matches!(
                         message.message_type(),
@@ -361,8 +359,10 @@ pub enum Direction {
 /// contained [`ReturnCode`]. Otherwise, the message should be dropped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum MessageError {
+    /// Message is invalid.
     #[error("invalid message: {0}")]
     Invalid(ReturnCode),
+    /// Message is invalid and should be dropped.
     #[error("message dropped: {0}")]
     Dropped(ReturnCode),
 }

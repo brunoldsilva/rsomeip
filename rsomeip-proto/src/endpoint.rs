@@ -1,3 +1,5 @@
+//! SOME/IP endpoints.
+
 use crate::{
     Interface, Message, MessageType, ProtocolVersion, ReturnCode, ServiceId,
     interface::{Direction, MessageError},
@@ -10,6 +12,7 @@ use std::collections::HashMap;
 /// This is used to process SOME/IP messages to and from serialized data.
 #[derive(Debug, Default, Clone)]
 pub struct Endpoint {
+    /// Map of service interfaces.
     interfaces: HashMap<ServiceId, Interface>,
 }
 
@@ -106,11 +109,11 @@ impl Endpoint {
     ///
     /// Returns the following errors:
     ///
-    /// - [`EndpointError::InvalidData`]: If the [`Message`] failed to be deserialized from the
+    /// - [`EndpointError::InvalidData`]: if the [`Message`] failed to be deserialized from the
     ///   `buffer`.
-    /// - [`EndpointError::InvalidMessage`]: If the [`Message`] was invalid and an error response
+    /// - [`EndpointError::InvalidMessage`]: if the [`Message`] was invalid and an error response
     ///   should be sent back to the source.
-    /// - [`EndpointError::MessageDropped`]: If the [`Message`] was invalid and should be dropped.
+    /// - [`EndpointError::MessageDropped`]: if the [`Message`] was invalid and should be dropped.
     ///
     /// # Examples
     ///
@@ -190,11 +193,11 @@ impl Endpoint {
     ///
     /// Returns the following errors:
     ///
-    /// - [`EndpointError::InvalidInput`]: If the [`Message`] failed to be serialized into the
+    /// - [`EndpointError::InvalidInput`]: if the [`Message`] failed to be serialized into the
     ///   `buffer`.
-    /// - [`EndpointError::InvalidMessage`]: If the [`Message`] was invalid and an error response
+    /// - [`EndpointError::InvalidMessage`]: if the [`Message`] was invalid and an error response
     ///   should be sent back to the source.
-    /// - [`EndpointError::MessageDropped`]: If the [`Message`] was invalid and should be dropped.
+    /// - [`EndpointError::MessageDropped`]: if the [`Message`] was invalid and should be dropped.
     ///
     /// # Examples
     ///
@@ -274,10 +277,13 @@ impl Endpoint {
 /// Represents an error during [`Endpoint`] operations.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum EndpointError<T> {
+    /// A deserialization error occurred.
     #[error("could not deserialize a message: {0}")]
     InvalidData(DeserializeError),
+    /// A serialization error occurred.
     #[error("could not serialize the message: {0}")]
     InvalidInput(SerializeError),
+    /// The message is invalid.
     #[error("invalid message: {message} reason={return_code}")]
     InvalidMessage {
         /// The message itself.
@@ -285,6 +291,7 @@ pub enum EndpointError<T> {
         /// The reason why the message is invalid.
         return_code: ReturnCode,
     },
+    /// The message is invalid and should be dropped.
     #[error("message dropped: {message} reason={return_code}")]
     MessageDropped {
         /// The message itself.
@@ -292,6 +299,7 @@ pub enum EndpointError<T> {
         /// The reason why the message is invalid.
         return_code: ReturnCode,
     },
+    /// Generic error.
     #[error("{0}")]
     Custom(String),
 }

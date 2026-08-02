@@ -341,14 +341,12 @@ where
                         }
                         Err(error) => {
                             eprintln!("deserialization failed: {error:?}");
-                            continue 'recv;
                         }
-                    };
+                    }
                 }
                 Err(RecvError::Lagged(count)) => {
                     // Took too long to process packets and some were lost.
                     eprintln!("lagged behind {count} packets");
-                    continue 'recv;
                 }
                 Err(RecvError::Closed) => {
                     // Socket is closed and will not receive any more data.
@@ -415,7 +413,7 @@ where
         let mut buffer = BytesMut::with_capacity(someip::HEADER_SIZE + message.payload.len());
         if let Err(error) = message.serialize(&mut buffer) {
             eprintln!("serialization failed {error:?}");
-        };
+        }
         if self.sender.send(buffer.freeze()).await.is_err() {
             eprintln!("socket is closed");
             Err("socket is closed")?;

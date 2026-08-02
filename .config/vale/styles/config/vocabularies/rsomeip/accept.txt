@@ -13,7 +13,7 @@
 AUTOSAR
 connectionless
 const
-impl
+impls?
 licensed as above
 rsomeip
 runtime
