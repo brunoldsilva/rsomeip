@@ -747,7 +747,7 @@ impl Serialize for MessageType {
     }
 
     fn size_hint(&self) -> usize {
-        1
+        size_of::<u8>()
     }
 }
 
@@ -873,7 +873,7 @@ impl Serialize for ReturnCode {
     }
 
     fn size_hint(&self) -> usize {
-        1
+        size_of::<u8>()
     }
 }
 

@@ -2,7 +2,7 @@
 # More info: <https://doc.rust-lang.org/cargo/reference/workspaces.html>
 
 [workspace]
-members = ["rsomeip-bytes", "rsomeip-proto"]
+members = ["rsomeip", "rsomeip-bytes", "rsomeip-proto"]
 resolver = "3"
 
 # Properties inherited by packages in this workspace.
