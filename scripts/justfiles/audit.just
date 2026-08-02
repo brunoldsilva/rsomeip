@@ -16,7 +16,5 @@ rust:
     cargo shear
     # Check for advisories, incompatible licenses and banned depencencies.
     cargo deny check
-    # Check if dependencies have been properly vetted.
-    cargo vet
 
 alias rs := rust

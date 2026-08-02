@@ -12,19 +12,22 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/brunoldsilva/rsomeip"
 categories = ["automotive", "network-programming"]
+rust-version = "1.85.1"
 
 # Dependencies inherited by packages in this workspace.
 [workspace.dependencies]
 # Serialization according to the SOME/IP on-wire format.
-rsomeip-bytes = { path = "./rsomeip-bytes", version = "0.1.0" }
+rsomeip-bytes = "0.1.0"
 # Types and trais for working with bytes.
-bytes = "1.10.1"
+bytes = { version = "1.10.1", default-features = false }
+# Micro benchmarking harness.
+criterion = "0.8.2"
 # Random number generators.
 rand = "0.8.5"
 # High-performance concurrent containers.
 scc = "3.8.4"
 # Used to specify error types in library code.
-thiserror = "2.0.14"
+thiserror = { version = "2.0.14", default-features = false }
 # Event-driven, non-blocking IO asynchronous runtime.
 tokio = "1.29.1"
 # Additional utilities for working with tokio.
@@ -51,6 +54,8 @@ pedantic = { level = "warn", priority = -1 }
 restriction = { level = "warn", priority = -1 }
 # Alphabetical ordering is undesirable.
 arbitrary_source_item_ordering = "allow"
+# Default representation when dealing with network data.
+big_endian_bytes = "allow"
 # Usage of the restriction lint group is intentional.
 blanket_clippy_restriction_lints = "allow"
 # Used to test at module crate boundaries.
@@ -67,10 +72,14 @@ impl_trait_in_params = "allow"
 missing_inline_in_public_items = "allow"
 # Unnecessary in most cases.
 missing_trait_methods = "allow"
+# Crates should appear flat to external users.
+pub_use = "allow"
 # Preferred method of returning early on error.
 question_mark_used = "allow"
 # Works well with `pattern_type_mismatch = warn`.
 ref_patterns = "allow"
+# Acceptable method of chaining options and results.
+return_and_then = "allow"
 # Preferred method of naming modules.
 self_named_module_files = "allow"
 # Prefer `1234_u16` over `1234u16`.
@@ -96,7 +105,3 @@ panic = "abort"
 inherits = "release"
 debug = true
 strip = "none"
-
-[workspace.metadata.vet]
-# Configure data store for cargo-vet.
-store = { path = "./.config/supply-chain" }

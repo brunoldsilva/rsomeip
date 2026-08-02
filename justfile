@@ -7,6 +7,9 @@
 # Commands for auditing depenencies.
 mod audit "scripts/justfiles/audit.just"
 
+# Commands for benchmarking source code.
+mod bench "scripts/justfiles/bench.just"
+
 # Commands for building binary targets.
 mod build "scripts/justfiles/build.just"
 

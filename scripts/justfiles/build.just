@@ -10,6 +10,8 @@ MSRV := "1.85"
 all:
     # Compile Rust binary targets.
     just build rust
+    # Build project documentation.
+    just build docs
 
 alias a := all
 
@@ -19,6 +21,9 @@ rust:
     cargo hack --feature-powerset build --release --lib --examples
     # Compile binary targets using the Minimum Supported Rust Version.
     cargo +{{ MSRV }} hack --feature-powerset build --release --lib --examples
+    # Compile binary targets against a `no_std` target.
+    cargo hack --package rsomeip-bytes --feature-powerset --skip std,default \
+        build --release --lib --examples --target thumbv7m-none-eabi
 
 alias rs := rust
 
