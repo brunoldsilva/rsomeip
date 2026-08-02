@@ -110,7 +110,7 @@ impl UdpSocket {
                     socket.join_multicast_v4(*address.ip(), Ipv4Addr::UNSPECIFIED)?;
                 }
                 SocketAddr::V6(address) => socket.join_multicast_v6(address.ip(), 0)?,
-            };
+            }
         }
         let receivers = SharedMap::default();
         let listener = SharedOption::<ConnectionSender>::default();

@@ -16,7 +16,7 @@ pub(crate) use port;
 /// - `ipv4!([127, 0, 0, 1])` creates the address `127.0.0.1` with a random port in the range
 ///   `49_152..65_535`.
 /// - `ipv4!()` creates a random address in the range `127.0.0.1-127.0.0.255` with a random
-///    port in the range `49_152..65_535`.
+///   port in the range `49_152..65_535`.
 macro_rules! ipv4 {
     ([$($addr:tt),*], $port:tt) => {
         ::std::net::SocketAddr::new(::std::net::IpAddr::V4(::std::net::Ipv4Addr::new($($addr),*)), $port)

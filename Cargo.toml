@@ -92,6 +92,8 @@ single_call_fn = "allow"
 std_instead_of_alloc = "allow"
 # Not targeting no_std environments.
 std_instead_of_core = "allow"
+# False positive. See "rust-clippy#17342".
+inline_modules = "allow"
 
 # Optimize the release profile for runtime performance.
 [profile.release]

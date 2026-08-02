@@ -1,6 +1,8 @@
-#![doc = include_str!("../README.md")]
+//! Sans-IO implementation of the SOME/IP protocol.
 
-pub(crate) mod message;
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
+
+mod message;
 pub use message::{GenericMessage, Header};
 
 /// SOME/IP message, Protocol Version 1.
@@ -11,16 +13,16 @@ pub use message::{GenericMessage, Header};
 /// This is used by [`Endpoint`] and [`Interface`] to further check messages for correctness.
 pub type Message<T> = GenericMessage<Header, T>;
 
-pub(crate) mod primitives;
+mod primitives;
 pub use primitives::{
     ClientId, InterfaceVersion, MessageId, MessageType, MessageTypeField, MethodId,
     ProtocolVersion, RequestId, ReturnCode, ServiceId, SessionId,
 };
 
-pub(crate) mod endpoint;
+mod endpoint;
 pub use endpoint::{Endpoint, EndpointError};
 
-pub(crate) mod interface;
+mod interface;
 pub use interface::{Interface, InterfaceType, MethodType};
 
 #[cfg(feature = "tp")]

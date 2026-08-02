@@ -151,7 +151,7 @@ impl Interfaces {
                 } else {
                     _ = entry.remove_entry();
                     Err("not available")?;
-                };
+                }
             }
             Entry::Vacant(_) => Err("not available")?,
         }

@@ -1,20 +1,148 @@
+# GitHub Actions workflow for Rust.
+#
+# Based on the Rust just recipes.
+#
+# More info: <https://docs.github.com/en/actions>
+
 name: Rust
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 env:
-  CARGO_TERM_COLOR: always
+    CARGO_TERM_COLOR: always
+    MSRV: "1.85"
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+    audit:
+        name: Audit dependencies
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dtolnay/rust-toolchain@stable
+            - uses: taiki-e/install-action@cargo-shear
+
+            - name: Check for unused dependencies
+              run: cargo shear
+
+            - name: Check advisories, licenses and banned dependencies
+              uses: EmbarkStudios/cargo-deny-action@v2
+              with:
+                  command: check
+
+    check:
+        name: Static analysis
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: rustfmt, clippy
+            - uses: taiki-e/install-action@cargo-hack
+            - uses: Swatinem/rust-cache@v2
+
+            - name: Check formatting
+              run: cargo fmt --check
+
+            - name: Clippy (feature powerset)
+              run: cargo hack --feature-powerset clippy --no-deps --profile test -- --deny warnings
+
+            - name: Check docs
+              env:
+                  RUSTDOCFLAGS: "-Dwarnings"
+              run: cargo hack --feature-powerset doc --no-deps --document-private-items
+
+    build:
+        name: Build (${{ matrix.toolchain }})
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                toolchain: [stable, msrv]
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: ${{ matrix.toolchain == 'msrv' && env.MSRV || 'stable' }}
+            - uses: taiki-e/install-action@cargo-hack
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  key: ${{ matrix.toolchain }}
+
+            - name: Build binary targets (feature powerset)
+              run: cargo hack --feature-powerset build --release --lib --examples
+
+    build-no-std:
+        name: Build (no_std, thumbv7m-none-eabi)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: thumbv7m-none-eabi
+            - uses: taiki-e/install-action@cargo-hack
+            - uses: Swatinem/rust-cache@v2
+
+            - name: Build rsomeip-bytes for thumbv7m-none-eabi
+              run: |
+                  cargo hack --package rsomeip-bytes --feature-powerset --skip std,default \
+                    build --release --lib --examples --target thumbv7m-none-eabi
+
+    unit:
+        name: Unit tests
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dtolnay/rust-toolchain@stable
+            - uses: taiki-e/install-action@cargo-hack
+            - uses: Swatinem/rust-cache@v2
+
+            - name: Run unit test suite (feature powerset)
+              run: cargo hack --feature-powerset test
+
+    mutants:
+        name: Mutation tests
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dtolnay/rust-toolchain@stable
+            - uses: taiki-e/install-action@cargo-mutants
+            - uses: Swatinem/rust-cache@v2
+
+            - name: Run mutation tests
+              run: |
+                  cargo mutants --all-features --output target/ \
+                    --jobs $(( ($(nproc) + 1) / 4 ))
+
+            - name: Upload mutants report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: mutants-report
+                  path: target/mutants.out
+
+    coverage:
+        name: Test coverage
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dtolnay/rust-toolchain@stable
+            - name: Install nightly toolchain
+              run: rustup toolchain install nightly
+            - uses: taiki-e/install-action@cargo-tarpaulin
+            - uses: Swatinem/rust-cache@v2
+
+            - name: Measure test code coverage
+              run: |
+                  cargo tarpaulin --engine llvm --all-features --tests --doc --fail-under 80 \
+                    --target-dir target/tarpaulin --output-dir target/tarpaulin --out Html
+
+            - name: Upload coverage report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage-report
+                  path: target/tarpaulin/tarpaulin-report.html

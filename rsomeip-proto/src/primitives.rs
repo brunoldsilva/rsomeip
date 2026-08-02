@@ -2,6 +2,8 @@
 //!
 //! This module provides strongly typed definitions for the primitives used by the SOME/IP protocol.
 
+use std::fmt;
+
 use rsomeip_bytes::{Buf, BufMut, Deserialize, DeserializeError, Serialize, SerializeError};
 
 /// Implements basic capabilities for new-types that wrap a single primitive.
@@ -83,15 +85,17 @@ macro_rules! impl_basic_type {
     };
 }
 
+/// Implements basic capabilities for u16 new types.
 macro_rules! impl_basic_type_u16 {
     ($name:ident) => {
-        impl_basic_type!($name, u16, as_u16, "{:04x?}");
+        impl_basic_type!($name, u16, as_u16, "{:04x}");
     };
 }
 
+/// Implements basic capabilities for u8 new types.
 macro_rules! impl_basic_type_u8 {
     ($name:ident) => {
-        impl_basic_type!($name, u8, as_u8, "{:02x?}");
+        impl_basic_type!($name, u8, as_u8, "{:02x}");
     };
 }
 
@@ -205,8 +209,9 @@ impl MessageId {
     #[inline]
     #[must_use]
     pub const fn from_u32(value: u32) -> Self {
-        let service = ServiceId::new((value >> 16) as u16);
-        let method = MethodId::new((value & 0xffff) as u16);
+        let [s1, s2, m1, m2] = value.to_be_bytes();
+        let service = ServiceId::new(u16::from_be_bytes([s1, s2]));
+        let method = MethodId::new(u16::from_be_bytes([m1, m2]));
         Self::new(service, method)
     }
 
@@ -223,8 +228,9 @@ impl MessageId {
     #[inline]
     #[must_use]
     pub const fn as_u32(self) -> u32 {
-        let service = (self.service.as_u16() as u32) << 16;
-        service | (self.method.as_u16() as u32)
+        let [s1, s2] = self.service.as_u16().to_be_bytes();
+        let [m1, m2] = self.method.as_u16().to_be_bytes();
+        u32::from_be_bytes([s1, s2, m1, m2])
     }
 }
 
@@ -258,7 +264,7 @@ impl Deserialize for MessageId {
     }
 }
 
-impl std::fmt::Display for MessageId {
+impl fmt::Display for MessageId {
     /// Formats `self` using the given formatter.
     ///
     /// # Examples
@@ -271,7 +277,7 @@ impl std::fmt::Display for MessageId {
     /// let message = MessageId::new(service, method);
     /// assert_eq!(format!("{message}"), "1234.5678");
     /// ```
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}.{}", self.service, self.method)
     }
 }
@@ -317,9 +323,9 @@ impl ClientId {
     /// ```
     #[inline]
     #[must_use]
-    pub const fn with_prefix(mut self, prefix: u8) -> Self {
-        self.0 |= (prefix as u16) << 8;
-        self
+    pub const fn with_prefix(self, prefix: u8) -> Self {
+        let [_c1, c2] = self.0.to_be_bytes();
+        Self(u16::from_be_bytes([prefix, c2]))
     }
 }
 
@@ -385,7 +391,7 @@ impl SessionId {
     /// assert_eq!(session.increment().as_u16(), 0x0001);
     /// assert_eq!(session.as_u16(), 0x0002);
     /// ```
-    #[expect(clippy::return_self_not_must_use)]
+    #[expect(clippy::return_self_not_must_use, reason = "may be discarded")]
     pub const fn increment(&mut self) -> Self {
         let old = self.0;
         self.0 = match old.wrapping_add(1) {
@@ -472,8 +478,9 @@ impl RequestId {
     /// ```
     #[must_use]
     pub const fn from_u32(value: u32) -> Self {
-        let client = ClientId::new((value >> 16) as u16);
-        let session = SessionId::new((value & 0xffff) as u16);
+        let [c1, c2, s1, s2] = value.to_be_bytes();
+        let client = ClientId::new(u16::from_be_bytes([c1, c2]));
+        let session = SessionId::new(u16::from_be_bytes([s1, s2]));
         Self::new(client, session)
     }
 
@@ -489,8 +496,9 @@ impl RequestId {
     /// ```
     #[must_use]
     pub const fn as_u32(self) -> u32 {
-        let client = (self.client.as_u16() as u32) << 16;
-        client | (self.session.as_u16() as u32)
+        let [c1, c2] = self.client.as_u16().to_be_bytes();
+        let [s1, s2] = self.session.as_u16().to_be_bytes();
+        u32::from_be_bytes([c1, c2, s1, s2])
     }
 }
 
@@ -524,7 +532,7 @@ impl Deserialize for RequestId {
     }
 }
 
-impl std::fmt::Display for RequestId {
+impl fmt::Display for RequestId {
     /// Formats `self` using the given formatter.
     ///
     /// # Examples
@@ -537,7 +545,7 @@ impl std::fmt::Display for RequestId {
     /// let request = RequestId::new(client, session);
     /// assert_eq!(format!("{request}"), "1234.5678");
     /// ```
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}.{}", self.client, self.session)
     }
 }
@@ -751,7 +759,7 @@ impl Deserialize for MessageType {
     }
 }
 
-impl std::fmt::Display for MessageType {
+impl fmt::Display for MessageType {
     /// Formats `self` using the given formatter.
     ///
     /// # Examples
@@ -761,7 +769,8 @@ impl std::fmt::Display for MessageType {
     ///
     /// assert_eq!(format!("{}", MessageType::Request), "Request");
     /// ```
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    #[expect(clippy::use_debug, reason = "Debug representation is desired")]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self:?}")
     }
 }
@@ -876,7 +885,7 @@ impl Deserialize for ReturnCode {
     }
 }
 
-impl std::fmt::Display for ReturnCode {
+impl fmt::Display for ReturnCode {
     /// Formats `self` using the given formatter.
     ///
     /// # Examples
@@ -886,7 +895,8 @@ impl std::fmt::Display for ReturnCode {
     ///
     /// assert_eq!(format!("{}", ReturnCode::Ok), "Ok");
     /// ```
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    #[expect(clippy::use_debug, reason = "Debug representation is desired")]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self:?}")
     }
 }

@@ -150,7 +150,6 @@ where
 }
 
 #[cfg(test)]
-#[expect(clippy::inline_modules, reason = "false-positive")]
 mod tests {
     use super::*;
     use crate::LengthU32;

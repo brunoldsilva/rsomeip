@@ -2,6 +2,8 @@
 //!
 //! This module provides the definition for the SOME/IP message.
 
+use std::{fmt, mem};
+
 use crate::{
     ClientId, InterfaceVersion, MessageId, MessageType, MessageTypeField, MethodId,
     ProtocolVersion, RequestId, ReturnCode, ServiceId, SessionId,
@@ -182,11 +184,11 @@ impl<H, B> GenericMessage<H, B> {
     /// ```
     #[inline]
     #[must_use]
-    pub fn map<T, U, F>(self, f: F) -> GenericMessage<T, U>
+    pub fn map<T, U, F>(self, map: F) -> GenericMessage<T, U>
     where
         F: FnOnce(H, B) -> (T, U),
     {
-        let (header, body) = f(self.header, self.body);
+        let (header, body) = map(self.header, self.body);
         GenericMessage::new(header, body)
             .with_service(self.service)
             .with_method(self.method)
@@ -205,11 +207,11 @@ impl<H, B> GenericMessage<H, B> {
     /// ```
     #[inline]
     #[must_use]
-    pub fn map_header<T, F>(self, f: F) -> GenericMessage<T, B>
+    pub fn map_header<T, F>(self, map: F) -> GenericMessage<T, B>
     where
         F: FnOnce(H) -> T,
     {
-        GenericMessage::new(f(self.header), self.body)
+        GenericMessage::new(map(self.header), self.body)
             .with_service(self.service)
             .with_method(self.method)
     }
@@ -227,11 +229,11 @@ impl<H, B> GenericMessage<H, B> {
     /// ```
     #[inline]
     #[must_use]
-    pub fn map_body<T, F>(self, f: F) -> GenericMessage<H, T>
+    pub fn map_body<T, F>(self, map: F) -> GenericMessage<H, T>
     where
         F: FnOnce(B) -> T,
     {
-        GenericMessage::new(self.header, f(self.body))
+        GenericMessage::new(self.header, map(self.body))
             .with_service(self.service)
             .with_method(self.method)
     }
@@ -252,7 +254,7 @@ impl<H, B> GenericMessage<H, B> {
     #[inline]
     #[must_use]
     pub const fn replace_header(&mut self, value: H) -> H {
-        std::mem::replace(&mut self.header, value)
+        mem::replace(&mut self.header, value)
     }
 
     /// Replaces the body of the message with the given `value`.
@@ -271,7 +273,7 @@ impl<H, B> GenericMessage<H, B> {
     #[inline]
     #[must_use]
     pub const fn replace_body(&mut self, value: B) -> B {
-        std::mem::replace(&mut self.body, value)
+        mem::replace(&mut self.body, value)
     }
 }
 
@@ -540,17 +542,20 @@ where
     B: Serialize,
 {
     fn serialize(&self, buffer: &mut impl BufMut) -> Result<usize, SerializeError> {
-        let mut size = 0;
-        size += serialize_into!(buffer, self.service, self.method)?;
-        size += serialize_into!(buffer, length = U32, &self.header, &self.body)?;
-        Ok(size)
+        serialize_into!(buffer, self.service, self.method).and_then(|total| {
+            serialize_into!(buffer, length = U32, &self.header, &self.body).and_then(|size| {
+                total
+                    .checked_add(size)
+                    .ok_or_else(|| SerializeError::Other(String::from("invalid size")))
+            })
+        })
     }
 
     fn size_hint(&self) -> usize {
-        let mut size = 0;
-        size += size_hint!(self.service, self.method);
-        size += size_hint!(length = U32, &self.header, &self.body);
-        size
+        #[expect(clippy::expect_used, reason = "work in progress")]
+        size_hint!(self.service, self.method)
+            .checked_add(size_hint!(length = U32, &self.header, &self.body))
+            .expect("should fit in usize")
     }
 }
 
@@ -614,9 +619,9 @@ where
     }
 }
 
-impl<H, B> std::fmt::Display for GenericMessage<H, B>
+impl<H, B> fmt::Display for GenericMessage<H, B>
 where
-    H: std::fmt::Display,
+    H: fmt::Display,
 {
     /// Formats `self` into a string.
     ///
@@ -630,7 +635,7 @@ where
     ///     .with_method(MethodId::new(0x5678));
     /// assert_eq!(message.to_string(), "1234.5678.header")
     /// ```
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}.{}.{}", self.service, self.method, self.header)
     }
 }
@@ -855,7 +860,7 @@ impl Deserialize for Header {
     }
 }
 
-impl std::fmt::Display for Header {
+impl fmt::Display for Header {
     /// Formats `self` using the given formatter.
     ///
     /// # Examples
@@ -870,10 +875,10 @@ impl std::fmt::Display for Header {
     ///     .with_return_code(ReturnCode::Ok);
     /// assert_eq!(header.to_string(), "1234.5678.02.00")
     /// ```
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}.{}.{:02x?}.{:02x?}",
+            "{}.{}.{:02x}.{:02x}",
             self.client,
             self.session,
             u8::from(self.message_type),
@@ -887,7 +892,7 @@ mod tests {
     use super::*;
     use rsomeip_bytes::BytesMut;
 
-    const DESERIALIZED_MESSAGE: GenericMessage<u8, u8> = GenericMessage::new(1u8, 2u8)
+    const DESERIALIZED_MESSAGE: GenericMessage<u8, u8> = GenericMessage::new(1_u8, 2_u8)
         .with_service(ServiceId::new(0x1234_u16))
         .with_method(MethodId::new(0x5678_u16));
 

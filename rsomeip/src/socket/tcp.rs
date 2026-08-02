@@ -142,7 +142,7 @@ impl Sender for TcpSender {
                     }
                     return Ok(());
                 }
-                Err(ref error) if error.kind() == std::io::ErrorKind::WouldBlock => continue,
+                Err(ref error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
                 Err(_) => return Err(SendError(buffer)),
             }
         }

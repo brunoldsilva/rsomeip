@@ -241,7 +241,7 @@ impl Stub {
             self.connections.share_and_store(address, connection).await;
         } else {
             Err("not connected")?;
-        };
+        }
         Ok(())
     }
 }
@@ -298,13 +298,12 @@ impl endpoint::Proxy for Proxy {
 
     // Receives a message from the remote address.
     async fn recv(&mut self) -> Result<someip::Message<Bytes>> {
-        'recv: loop {
+        loop {
             match self.receiver.recv().await {
                 Some((message, source)) => {
                     if self.remote == source {
                         return Ok(message);
                     }
-                    continue 'recv;
                 }
                 None => {
                     // Connection is closed.
@@ -400,6 +399,8 @@ where
     ///
     /// `Datagram` type protocols allow this behavior, but `Stream` type protocols require that the
     /// client be the one to establish the connection.
+    ///
+    /// [`ProtocolType`]: crate::socket::ProtocolType
     async fn connect(&mut self, address: SocketAddr) -> Result<Connection> {
         if matches!(C::PROTOCOL_TYPE, socket::ProtocolType::Datagram(_)) {
             let connection = self.connector.connect(&address).await?;
@@ -424,7 +425,7 @@ where
     async fn stub(&mut self, id: InterfaceId) -> Result<Stub> {
         // Check if the interface already exists.
         if self.interfaces.check(id).await {
-            return Err("already exists")?;
+            Err("already exists")?;
         }
 
         // Get or create a listener for incoming connections.
@@ -481,7 +482,7 @@ where
     async fn proxy(&mut self, id: InterfaceId, address: SocketAddr) -> Result<Proxy> {
         // Check if the interface already exists.
         if self.interfaces.check(id).await {
-            return Err("already exists")?;
+            Err("already exists")?;
         }
 
         // Get or create a connection to the remote address.

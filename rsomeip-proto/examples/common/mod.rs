@@ -1,3 +1,10 @@
+//! Definitions used by multiple examples.
+
+#![expect(
+    clippy::mod_module_files,
+    reason = "no alternative for sharing definitions between examples"
+)]
+
 use rsomeip_proto::{MethodId, ServiceId};
 use std::net::SocketAddr;
 
@@ -13,7 +20,7 @@ pub fn stub_address() -> SocketAddr {
 }
 
 /// Returns the address of the service consumer.
-#[allow(dead_code, reason = "false positive")]
+#[expect(dead_code, reason = "false positive")]
 pub fn proxy_address() -> SocketAddr {
     ([127, 0, 0, 2], 30509).into()
 }

@@ -1,13 +1,19 @@
-//! SOME/IP Transport Protocol
+//! SOME/IP Transport Protocol.
 //!
 //! This module provides an implementation of the Transport Protocol - an extension of the SOME/IP
 //! protocol design to segment large messages.
+
+#![expect(clippy::module_name_repetitions, reason = "work in progress")]
+#![expect(clippy::integer_division, reason = "work in progress")]
+#![expect(clippy::integer_division_remainder_used, reason = "work in progress")]
+#![expect(clippy::arithmetic_side_effects, reason = "work in progress")]
 
 use crate::Message;
 use rsomeip_bytes::{
     Buf, BufMut, Bytes, BytesMut, Deserialize, DeserializeError, Serialize, serialize_into,
     size_hint,
 };
+use std::mem;
 
 /// SOME/IP-TP header.
 ///
@@ -29,6 +35,7 @@ impl TpHeader {
     /// The offset is measured in units of 16 bytes.
     pub const OFFSET_UNIT: usize = 16;
 
+    /// Maximum value of the offset.
     pub const MAX_OFFSET: usize = 0xffff_fff0;
 
     /// Creates a new [`TpHeader`] with the given `body`.
@@ -166,7 +173,7 @@ impl TpHeader {
         // Join both headers.
         self.body = {
             // Try to reclaim the BytesMut to avoid having to make an extra copy.
-            let mut body = BytesMut::from(std::mem::take(&mut self.body));
+            let mut body = BytesMut::from(mem::take(&mut self.body));
             body.put(other.body);
             body.freeze()
         };
@@ -185,14 +192,14 @@ impl Serialize for TpHeader {
                 self.offset
             )));
         }
-        let offset = u32::try_from(self.offset << 4).unwrap_or(0xffff_fff0);
+        let offset = u32::try_from(self.offset << 4_usize).unwrap_or(0xffff_fff0);
         let header = offset | u32::from(self.more_segments);
         serialize_into!(buffer, header, &self.body)
     }
 
     fn size_hint(&self) -> usize {
         // Both `offset` and `more_segments` occupy the same `u32` field.
-        size_hint!(0u32, &self.body)
+        size_hint!(0_u32, &self.body)
     }
 }
 
@@ -224,7 +231,12 @@ pub enum TpError {
     UnexpectedSegment(TpHeader),
     /// Tried to join a header with the wrong offset.
     #[error("tried to join header with wrong offset: expected={expected} actual={}", other.offset)]
-    WrongOffset { expected: usize, other: TpHeader },
+    WrongOffset {
+        /// Expected offset.
+        expected: usize,
+        /// Observed offset.
+        other: TpHeader,
+    },
 }
 
 impl<T> Message<T>
@@ -311,7 +323,7 @@ mod tests {
             Some(TpHeader {
                 offset: 0,
                 more_segments: true,
-                body: Bytes::copy_from_slice([0u8; 16].as_slice())
+                body: Bytes::copy_from_slice([0_u8; 16].as_slice())
             })
         );
         assert_eq!(
@@ -319,7 +331,7 @@ mod tests {
             Some(TpHeader {
                 offset: 1,
                 more_segments: true,
-                body: Bytes::copy_from_slice([1u8; 16].as_slice())
+                body: Bytes::copy_from_slice([1_u8; 16].as_slice())
             })
         );
         assert_eq!(header.split(16), None);
@@ -328,14 +340,14 @@ mod tests {
             TpHeader {
                 offset: 2,
                 more_segments: false,
-                body: Bytes::copy_from_slice([2u8; 16].as_slice())
+                body: Bytes::copy_from_slice([2_u8; 16].as_slice())
             }
         );
     }
 
     #[test]
     fn limit_is_multiple_of_16() {
-        let mut header = TpHeader::new(Bytes::copy_from_slice([0u8; 32].as_slice()));
+        let mut header = TpHeader::new(Bytes::copy_from_slice([0_u8; 32].as_slice()));
         assert_eq!(
             header.split(15), // Must be greater than 15.
             None
@@ -345,7 +357,7 @@ mod tests {
             Some(TpHeader {
                 offset: 0,
                 more_segments: true,
-                body: Bytes::copy_from_slice([0u8; 16].as_slice())
+                body: Bytes::copy_from_slice([0_u8; 16].as_slice())
             })
         );
         assert_eq!(
@@ -353,7 +365,7 @@ mod tests {
             TpHeader {
                 offset: 1,
                 more_segments: false,
-                body: Bytes::copy_from_slice([0u8; 16].as_slice())
+                body: Bytes::copy_from_slice([0_u8; 16].as_slice())
             }
         );
     }
@@ -363,13 +375,13 @@ mod tests {
         let mut header = TpHeader {
             offset: 0,
             more_segments: true,
-            body: Bytes::copy_from_slice([0u8; 16].as_slice()),
+            body: Bytes::copy_from_slice([0_u8; 16].as_slice()),
         };
         assert_eq!(
             header.join(TpHeader {
                 offset: 1,
                 more_segments: false,
-                body: Bytes::copy_from_slice([0u8; 16].as_slice())
+                body: Bytes::copy_from_slice([0_u8; 16].as_slice())
             }),
             Ok(())
         );
@@ -378,18 +390,18 @@ mod tests {
             TpHeader {
                 offset: 0,
                 more_segments: false,
-                body: Bytes::copy_from_slice([0u8; 32].as_slice())
+                body: Bytes::copy_from_slice([0_u8; 32].as_slice())
             }
         );
     }
 
     #[test]
     fn extra_segments_are_not_joined() {
-        let mut header = TpHeader::new(Bytes::copy_from_slice([0u8; 16].as_slice()));
+        let mut header = TpHeader::new(Bytes::copy_from_slice([0_u8; 16].as_slice()));
         let other = TpHeader {
             offset: 1,
             more_segments: false,
-            body: Bytes::copy_from_slice([0u8; 16].as_slice()),
+            body: Bytes::copy_from_slice([0_u8; 16].as_slice()),
         };
         assert_eq!(
             header.join(other.clone()),
@@ -402,12 +414,12 @@ mod tests {
         let mut header = TpHeader {
             offset: 0,
             more_segments: true,
-            body: Bytes::copy_from_slice([0u8; 16].as_slice()),
+            body: Bytes::copy_from_slice([0_u8; 16].as_slice()),
         };
         let other = TpHeader {
             offset: 2,
             more_segments: false,
-            body: Bytes::copy_from_slice([0u8; 16].as_slice()),
+            body: Bytes::copy_from_slice([0_u8; 16].as_slice()),
         };
         assert_eq!(
             header.join(other.clone()),
@@ -416,19 +428,19 @@ mod tests {
     }
 
     // offset=1 more_segments=true body=1
-    const SERIALIZED_HEADER: [u8; 5] = [0u8, 0, 0, 0b0001_0001, 1];
+    const SERIALIZED_HEADER: [u8; 5] = [0_u8, 0, 0, 0b0001_0001, 1];
 
     #[test]
     fn header_is_serializable() {
         let header = TpHeader {
             offset: 1,
             more_segments: true,
-            body: Bytes::copy_from_slice(&[1u8]),
+            body: Bytes::copy_from_slice(&[1_u8]),
         };
         let mut buffer = BytesMut::with_capacity(5);
         assert_eq!(header.size_hint(), 5);
         assert_eq!(header.serialize(&mut buffer), Ok(5));
-        assert_eq!(&buffer.freeze()[..], &SERIALIZED_HEADER);
+        assert_eq!(&buffer.freeze(), &SERIALIZED_HEADER.as_slice());
     }
 
     #[test]
@@ -439,7 +451,7 @@ mod tests {
             Ok(TpHeader {
                 offset: 1,
                 more_segments: true,
-                body: Bytes::copy_from_slice(&[1u8])
+                body: Bytes::copy_from_slice(&[1_u8])
             })
         );
     }
@@ -449,9 +461,11 @@ mod tests {
         let header = TpHeader {
             offset: 0xffff_ffff,
             more_segments: true,
-            body: Bytes::copy_from_slice(&[1u8]),
+            body: Bytes::copy_from_slice(&[1_u8]),
         };
         let mut buffer = BytesMut::with_capacity(5);
-        assert!(header.serialize(&mut buffer).is_err());
+        _ = header
+            .serialize(&mut buffer)
+            .expect_err("should fail with invalid offset");
     }
 }
