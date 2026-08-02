@@ -73,8 +73,7 @@ function install-deps {
         cargo-hack \
         cargo-mutants \
         cargo-shear \
-        cargo-tarpaulin \
-        cargo-vet
+        cargo-tarpaulin
 }
 
 # Entrypoint of the script.

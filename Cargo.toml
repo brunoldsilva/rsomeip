@@ -105,7 +105,3 @@ panic = "abort"
 inherits = "release"
 debug = true
 strip = "none"
-
-[workspace.metadata.vet]
-# Configure data store for cargo-vet.
-store = { path = "./.config/supply-chain" }

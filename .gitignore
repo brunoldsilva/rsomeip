@@ -60,6 +60,7 @@
 
 # Vale linter configuration.
 !.vale.ini
+!.config/
 !.config/vale/
 !.config/vale/styles/
 !.config/vale/styles/config/
@@ -70,9 +71,5 @@
 # Markdownlint configuration.
 !.markdownlint.yml
 
-# cargo-deny and cargo-vet configurations.
+# cargo-deny configurations.
 !deny.toml
-!.config/
-!.config/supply-chain/
-!.config/supply-chain/*.toml
-!.config/supply-chain/*.lock
