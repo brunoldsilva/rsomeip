@@ -137,6 +137,7 @@ impl Connector for UdpSocket {
 
     const PROTOCOL_TYPE: ProtocolType = ProtocolType::Datagram(MAX_DATAGRAM_SIZE);
 
+    #[expect(clippy::unused_async_trait_impl, reason = "FIXME")]
     async fn connect(&mut self, address: &SocketAddr) -> IoResult<(Self::Sender, Self::Receiver)> {
         let (sender, receiver) = broadcast::channel(8);
         self.receivers.insert(*address, sender);
@@ -150,6 +151,7 @@ impl Connector for UdpSocket {
         ))
     }
 
+    #[expect(clippy::unused_async_trait_impl, reason = "FIXME")]
     async fn listen(&mut self, backlog: u32) -> IoResult<Self::Listener> {
         let (sender, receiver) = mpsc::channel(backlog as usize);
         {
