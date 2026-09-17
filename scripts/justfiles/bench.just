@@ -19,6 +19,6 @@ rust *ARGS:
     # Wait for the environment to stabilize before running the benchmarks.
     sleep 30
     # Run the benchmark tests on an isolated core.
-    taskset -c 8 cargo bench -- {{ ARGS }}
+    taskset -c $(nproc --ignore 1) cargo bench -- {{ ARGS }}
 
 alias rs := rust

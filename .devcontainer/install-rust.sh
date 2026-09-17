@@ -71,9 +71,9 @@ function install-deps {
     cargo binstall --locked --no-confirm --disable-telemetry \
         cargo-deny \
         cargo-hack \
+        cargo-llvm-cov \
         cargo-mutants \
-        cargo-shear \
-        cargo-tarpaulin
+        cargo-shear
 }
 
 # Entrypoint of the script.

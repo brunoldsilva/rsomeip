@@ -107,6 +107,7 @@ impl Connector for TcpSocket {
         Ok((TcpSender { inner: sender }, TcpReceiver::new(receiver)))
     }
 
+    #[expect(clippy::unused_async_trait_impl, reason = "FIXME")]
     async fn listen(&mut self, backlog: u32) -> IoResult<Self::Listener> {
         let socket = match self.address {
             SocketAddr::V4(_) => net::TcpSocket::new_v4(),
