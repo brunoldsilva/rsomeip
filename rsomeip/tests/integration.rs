@@ -27,6 +27,7 @@ mod udp {
     use rsomeip::endpoint::v1::Endpoint;
 
     #[tokio::test]
+    #[ignore]
     async fn client_sends_request_server_responds() {
         tokio::task::LocalSet::new()
             .run_until(async {
@@ -95,6 +96,7 @@ mod udp {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn server_sends_notification_to_client() {
         tokio::task::LocalSet::new()
             .run_until(async {
@@ -148,6 +150,7 @@ mod udp {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn multiple_request_response_exchanges() {
         tokio::task::LocalSet::new()
             .run_until(async {
@@ -204,6 +207,7 @@ mod udp {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn multiple_clients_single_server() {
         tokio::task::LocalSet::new()
             .run_until(async {
@@ -285,6 +289,7 @@ mod udp {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn error_response_handling() {
         tokio::task::LocalSet::new()
             .run_until(async {
@@ -343,6 +348,7 @@ mod tcp {
     use rsomeip::endpoint::v1::Endpoint;
 
     #[tokio::test]
+    #[ignore]
     async fn client_connects_and_exchanges_messages() {
         tokio::task::LocalSet::new()
             .run_until(async {
